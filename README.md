@@ -24,6 +24,13 @@ test "Object":
     fail()
 ```
 
+### Plan
+
+* capturing
+* subpatterns
+* a `matches` abstraction that one can use either with capture arg as in [timotheecour idea](https://github.com/nim-lang/Nim/issues/8649#issuecomment-413323627 ) or as something that returns options
+* custom unpackers
+
 ### Questions and answers
 
 **I don't like @name : it's bizarre and surprising for users**

@@ -8,8 +8,7 @@ An experiment in building a nim macro-based pattern matching library.
 
 A macro `match` generates an if construct for now.
 
-```
-nim
+```nim
 
 test "Object":
   let a = Rectangle(a: 2, b: 0)
@@ -42,4 +41,4 @@ I like it, but I'd welcome ideas for a better syntax! Please, first check this l
 
 I took inspiration from their DSL-s and discussions with them (An early version of this dsl was even a PR to @krux02 's lib).
 
-Thanks to @mratsim for giving me the `@name` idea with one of his github comments on possible nim pattern matching syntax, I initially had way more inconsistent notation in mind.
+Thanks to [@mratsim](https://github.com/mratsim) for giving me the `@name` idea with one of his [github comments on possible nim pattern matching syntax](https://github.com/nim-lang/Nim/issues/8649#issuecomment-413318800), I initially had way more inconsistent notation in mind.

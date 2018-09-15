@@ -35,10 +35,10 @@ I like it, but I'd welcome ideas for a better syntax! Please, first check this l
 
 ### Credits
 
- @krux02 and @andreaferetti are authors of the original nim pattern matching libs:
+[@krux02](https://github.com/krux02/) and [@andreaferretti](https://github.com/andreaferretti) are authors of the original nim pattern matching libs:
 
-* @krux02 's ast-pattern-matching 
-* @andreaferetti 's patty
+* @krux02 's [ast-pattern-matching](https://github.com/krux02/ast-pattern-matching)
+* @andreaferretti 's [patty](https://github.com/andreaferretti/patty)
 
 I took inspiration from their DSL-s and discussions with them (An early version of this dsl was even a PR to @krux02 's lib).
 

@@ -1,5 +1,7 @@
 # nim-experiment
 
+# DON'T USE, NOT READY
+README and project in progress
 
 
 An experiment in building a nim macro-based pattern matching library.

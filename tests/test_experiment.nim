@@ -114,3 +114,43 @@ suite "match":
     # else:
     #   fail()
 
+  test "Sequence":
+    let a = @[Rectangle(a: 2, b: 4), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4)]
+
+    match(a):
+    of @[]:
+      fail()
+    of @[_, *(a: 4, b: 4) @others]:
+      check(others == a[1 .. ^1])
+    else:
+      fail()
+
+    # 
+    # if a == @[]:
+    #   fail()
+    # elif a.len >= 1 and true and a[1 .. ^1].allIt(it.a == 4 and it.b == 4):
+    #   let tmp1 = a[1 .. ^1]
+    #   let others = tmp1
+    #   check(others == a[1 .. ^1])
+    # else:
+    #   fail()
+  
+  test "Sequence subpattern":
+    let a = @[Rectangle(a: 2, b: 4), Rectangle(a: 4, b: 0), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4)]
+
+    match(a):
+    of @[]:
+      fail()
+    of @[_, _, *(a: @list)]:
+      check(list == @[4, 4])
+    else:
+      fail()
+
+    #
+    # if a == @[]:
+    #   fail()
+    # elif a.len >= 1 and true and true: # notice: optimized
+    #   let list = a[1 .. ^1].mapIt(it.a)
+    #   check(list == @[4, 4])
+    # else:
+    #   fail()

@@ -65,8 +65,52 @@ proc loadShape(input: NimNode): Shape =
     Shape(kind: MSeq, element: nil)
 
 
+# detects *pattern and *pattern @name
+proc isManyPattern(node: NimNode): bool =
+  node.kind == nnkPrefix and node[0].repr == "*" #or
+    #node.kind == nnkCommand and node[0].isManyPattern and node[1].kind == nnkPrefix and node[1][0].repr == "@"
 
 var tmpCount = 0
+
+proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (NimNode, NimNode)
+# generates for *pattern and *pattern @name
+proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, capture: int = -1): (NimNode, NimNode, int) =
+  var manyPattern: NimNode
+  var name: NimNode
+  var test: NimNode
+  var newCode = emptyStmtList()
+  if pattern[1].kind != nnkCommand:
+    manyPattern = pattern[1]
+  else:
+    manyPattern = pattern[1][0]
+    name = pattern[1][1][1]
+  echo "LOAD:", pattern.lisprepr
+  let inputNode = quote do: `input`[`i` .. ^1]
+  let (itTest, itNode) = load(manyPattern, ident("it"), shape, capture)
+  if not itNode.isNil:
+    for section in itNode:
+      # let name = code
+      # generates let name = inputNode.mapIt(code)
+      if section.kind == nnkLetSection:
+        for child in section:
+          echo child.lisprepr
+          let childName = child[0]
+          let childCode = child[2]
+          let assign = quote:
+            let `childName` = `inputNode`.mapIt(`childCode`)
+          newCode.add(assign)
+
+  if itTest.repr == "true":
+    test = itTest # optimized
+  else:
+    test = quote:
+      `inputNode`.allIt(`itTest`)
+  if not name.isNil:
+    # slow, we need views for zero overhead: https://github.com/nim-lang/Nim/issues/5753  
+    let assign = quote:
+      let `name` = `inputNode`
+    newCode.add(assign)
+  result = (test, newCode, 0)
 
 # FAITH
 proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (NimNode, NimNode) =
@@ -147,12 +191,46 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
         newCode = quote:
           let `name` = `input`
       of nnkBracket:
-        # @list a sequence match
+        # @list a sequence match: it matches its elements
+        # generates:
+        #
+        #
+        # if input.len >= a and elements # test
+        # 
+        # capturing code # code
+        #
+
         if pattern[1].len == 0:
           test = quote do: `input` == `pattern`
           newCode = emptyStmtList()
         else:
-          error "pattern not supported"
+          var min = 0
+          var t: NimNode
+          newCode = emptyStmtList()
+          for i, element in pattern[1]:
+            let elementNode = quote do: `input`[`i`]
+            var elementTest: NimNode
+            var elementCode: NimNode
+            if not element.isManyPattern():
+              (elementTest, elementCode) = load(element, elementNode, shape, capture)
+              min += 1
+            else:
+              if i != pattern[1].len - 1:
+                error "pattern expected * last"
+              var elementMin = 0
+              # Thank God!
+              (elementTest, elementCode, elementMin) = loadManyPattern(element, input, i, shape, capture)
+              # min is different for * and +
+              # we generate sequtils allIt
+              min += elementMin
+            if t.isNil:
+              t = elementTest
+            else:
+              t = quote do: `t` and `elementTest`
+            newCode.add(elementCode)
+          let minTest =  quote do: `input`.len >= `min`
+          test = quote do: `minTest` and `t`
+            
       else:
         error "pattern not supported"
     of "~":
@@ -179,6 +257,21 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     let (fieldTest, fieldCode) = load(fields, input, shape, capture)
     test = quote do: `test` and `fieldTest`
     newCode = fieldCode
+  of nnkIdent:
+    case pattern.repr:
+    of "_":
+      # wildcard: it matches everything
+      # generates
+      #
+      #
+      # true # test
+      #
+      # no code
+      #
+      test = quote do: true
+      newCode = emptyStmtList()
+    else:
+      error "pattern not supported"
   else:
     error "pattern not supported"
   (test, newCode)
@@ -221,5 +314,5 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
     echo i.lisprepr
 
 
-
+export sequtils
 

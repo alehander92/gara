@@ -13,7 +13,10 @@ type
 
   Author = object
     name: string
-    email: string
+    email: Email
+
+  Email = object
+    raw: string
 
   # just an example: nice for match
   CommitType = enum Normal, Merge, First, Fix
@@ -31,7 +34,7 @@ type
       fix: string
     message: string
 
-let repo = Repo(name: "NewDB", author: Author(name: "John John", email: "john@newdb.org"), commits: @[
+let repo = Repo(name: "ExampleDB", author: Author(name: "Example Author", email: Email(raw: "example@exampledb.org")), commits: @[
               Commit(t: First, message: "First", code: "e:0"),
               Commit(t: Normal, message: "Normal", diff: "+e:2\n-e:0")])
 
@@ -93,24 +96,24 @@ suite "match":
     match(a):
     of (name: "New", commits: @[]):
       fail()
-    of (name: @name, author: Author(name: "John John", email: @email), commits: @commits):
-      check(name == "NewDB")
-      check(email == "john@newdb.org")
+    of (name: @name, author: Author(name: "Example Author", email: @email), commits: @commits):
+      check(name == "ExampleDB")
+      check(email.raw == "example@exampledb.org")
     else:
       fail()
 
     # 
     # if a.name == "New" and a.commits == @[]:
     #   fail()
-    # elif true and a.author is Author and a.author.name == "John John" and true and true:
+    # elif true and a.author is Author and a.author.name == "Example Author" and true and true:
     #   let tmp1 = a.name
     #   let name = tmp1
     #   let tmp2 = a.author.email
     #   let email = tmp2
     #   let tmp3 = a.commits
     #   let commits = tmp3
-    #   check(name == "NewDB")
-    #   check(email == "john@newdb.org")
+    #   check(name == "Example Author")
+    #   check(email == "example@exampledb.org")
     # else:
     #   fail()
 
@@ -149,8 +152,86 @@ suite "match":
     #
     # if a == @[]:
     #   fail()
-    # elif a.len >= 1 and true and true: # notice: optimized
-    #   let list = a[1 .. ^1].mapIt(it.a)
+    # elif a.len >= 2 and true and true: # notice: optimized
+    #   let list = a[2 .. ^1].mapIt(it.a)
     #   check(list == @[4, 4])
     # else:
     #   fail()
+  
+  test "Variant":
+    let a = ~Commit.Normal(message: "e", diff: "z")
+
+    match(a):
+    of ~Merge(original: @original, other: @other):
+      fail()
+    of ~Normal(message: @message):
+      check(message == "e")
+    else:
+      fail()
+
+    #
+    # if a.eKind == Merge:
+    #   let original = a.original
+    #   let other = a.other
+    #   fail()
+    # elif a.eKind == Normal:
+    #   let message = a.message
+    #   check(message == "e")
+    # else:
+    #   fail()
+
+  test "Custom unpackers":
+    let email = repo.author.email
+
+    proc data(email: Email): tuple[name: string, domain: string] =
+      let words = email.raw.split('@', 1)
+      (name: words[0], domain: words[1])
+
+    proc tokens(email: Email): seq[string] =
+      # work for js slow
+      result = @[]
+      var token = ""
+      for i, c in email.raw:
+        if not c.isAlphaNumeric():
+          if token.len > 0:
+            result.add(token)
+            token = ""
+          result.add($c)
+        else:
+          token.add(c)
+      if token.len > 0:
+        result.add(token)
+
+    match(email):
+    of data(name: "academy"):
+      fail()
+    of tokens(@[_, _, _, _, @token]):
+      check(token == "org")
+
+    #
+    # if unpacker(data(email), (name: "example")):
+    #   fail()
+    # elif unpacker(tokens(email), @[_, _, _, _, @token]):
+    #   let token = tmp1[4] # awesome, nim can define it in test
+    #   check(token == "org")
+    # else:
+    #   raise newException(ExperimentError, "nothing matched in match expression")
+    # unpacker:
+    #   let tmp2 = data(email)
+    #   tmp2.name == "example"
+    #   
+    #   let tmp3 = tokens(email)
+    #   tokens.len >= 4 and true and true and true and true and true
+suite "kind":
+  test "dsl":
+    var commit = ~Commit.Normal(message: "e", diff: "z")
+    check(commit.message == "e")
+
+    commit = ~Commit.Merge(original: commit, other: commit)
+    check(commit.original.message == "e")
+
+
+# ~Commit.Merge(original: ~Commit.Normal(message: "e"), other: ~Commit.Normal(message: "f"))
+# ^Commit.Merge(original: ^Commit.Normal(message: "e"), other: ^Commit.Normal(message: "f"))
+# &Commit.Merge(original: &Commit.Normal(message: "e"), other: &Commit.Normal(message: "f"))
+# %Commit.Merge(original: %Commit.Normal(message: "e"), other: %Commit.Normal(message: "f"))

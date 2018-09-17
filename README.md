@@ -24,6 +24,22 @@ test "Object":
     fail()
 ```
 
+### Features
+
+Matching 
+
+* values
+* types
+* capture with `@name`
+* nested subpatterns
+* fields of objects
+* variants
+* wildcard
+* elements of seq
+* match many elements in seq with `*`
+* custom unpackers (thanks to @krux02 for making me aware of the scala pattern matching design and apply/unapply: they work differently here though)
+* DSL for init variants with `~Variant.Kind(fields)`
+
 ### Goals
 
 * Ability to generate code with zero overhead compared to manually written if/case/for equivalents
@@ -46,6 +62,10 @@ With enough discipline we can generate pretty readable code from our macro.
 This would be very beneficial for the end user, as we can map his invocation with the generated code and help him
 see the problem easily.
 
+It's not always possible to directly produce nice code, so sometimes we'll delegate to other macros.
+Still, maybe we can make their code also visible in debug mode, so the user still knows what happened
+
+
 There are 3 cases:
 
 * The user had a logical error in his patterns: easily seen with the generated code
@@ -54,8 +74,6 @@ There are 3 cases:
 
 ### Plan
 
-* capturing
-* subpatterns
 * a `matches` abstraction that one can use either with capture arg as in [timotheecour idea](https://github.com/nim-lang/Nim/issues/8649#issuecomment-413323627 ) or as something that returns options
 * custom unpackers
 

@@ -74,7 +74,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
   var test: NimNode
   var newCode: NimNode
   case pattern.kind:
-  of nnkIntLit:
+  of nnkIntLit, nnkStrLit:
     (test, newCode) = atomTest(pattern, input, capture)
   of nnkCommand:
     if pattern[1].kind != nnkPrefix or pattern[1][0].repr != "@":
@@ -148,7 +148,11 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
           let `name` = `input`
       of nnkBracket:
         # @list a sequence match
-        error "pattern not supported"
+        if pattern[1].len == 0:
+          test = quote do: `input` == `pattern`
+          newCode = emptyStmtList()
+        else:
+          error "pattern not supported"
       else:
         error "pattern not supported"
     of "~":
@@ -156,6 +160,25 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       error "pattern not supported"
     else:
       error "pattern not supported"
+  of nnkObjConstr:
+    # Type(fields), it checks if the type is matched and then it checks the fields
+    # generates
+    #
+    #
+    # input is Type and fields match # test
+    #
+    # no code
+    #
+    # 
+    let typ = pattern[0]
+    test = quote do: `input` is `typ`
+    var fields = nnkPar.newTree()
+    for i, field in pattern:
+      if i > 0:
+        fields.add(field)
+    let (fieldTest, fieldCode) = load(fields, input, shape, capture)
+    test = quote do: `test` and `fieldTest`
+    newCode = fieldCode
   else:
     error "pattern not supported"
   (test, newCode)

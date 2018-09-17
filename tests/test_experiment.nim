@@ -6,6 +6,34 @@ type
     a: int
     b: int
 
+  Repo = ref object
+    name: string
+    author: Author
+    commits: seq[Commit]
+
+  Author = object
+    name: string
+    email: string
+
+  # just an example: nice for match
+  CommitType = enum Normal, Merge, First, Fix
+  
+  Commit = ref object
+    case t: CommitType:
+    of Normal:
+      diff: string # simplified
+    of Merge:
+      original: Commit
+      other: Commit
+    of First:
+      code: string
+    of Fix:
+      fix: string
+    message: string
+
+let repo = Repo(name: "NewDB", author: Author(name: "John John", email: "john@newdb.org"), commits: @[
+              Commit(t: First, message: "First", code: "e:0"),
+              Commit(t: Normal, message: "Normal", diff: "+e:2\n-e:0")])
 
 suite "match":
   test "Simple check":
@@ -58,4 +86,31 @@ suite "match":
     #   let tmp1 = a.b
     #   let b = tmp1
     #   check(b == 0)
+
+  test "Subpattern":
+    let a = repo # look in beginning
+
+    match(a):
+    of (name: "New", commits: @[]):
+      fail()
+    of (name: @name, author: Author(name: "John John", email: @email), commits: @commits):
+      check(name == "NewDB")
+      check(email == "john@newdb.org")
+    else:
+      fail()
+
+    # 
+    # if a.name == "New" and a.commits == @[]:
+    #   fail()
+    # elif true and a.author is Author and a.author.name == "John John" and true and true:
+    #   let tmp1 = a.name
+    #   let name = tmp1
+    #   let tmp2 = a.author.email
+    #   let email = tmp2
+    #   let tmp3 = a.commits
+    #   let commits = tmp3
+    #   check(name == "NewDB")
+    #   check(email == "john@newdb.org")
+    # else:
+    #   fail()
 

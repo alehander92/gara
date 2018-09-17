@@ -24,6 +24,34 @@ test "Object":
     fail()
 ```
 
+### Goals
+
+* Ability to generate code with zero overhead compared to manually written if/case/for equivalents
+* Expressive and flexible syntax for patterns
+* Nice error reporting based on understandable generated code
+
+The goals are ordered by priority. 
+
+Speed is very important: the goal is to be able to use matching everywhere where you'd use a complicated `if`/`case`.
+If there are cases, when we're slower:
+
+This should be considered a bug.
+
+or
+
+This is a limitation of the library: which is not cool.
+
+
+With enough discipline we can generate pretty readable code from our macro.
+This would be very beneficial for the end user, as we can map his invocation with the generated code and help him
+see the problem easily.
+
+There are 3 cases:
+
+* The user had a logical error in his patterns: easily seen with the generated code
+* The user used a pattern in an unexpected way: this way he can see how its expansion differs from his expectation
+* Our patterns worked incorrectly: the user can issue a bug
+
 ### Plan
 
 * capturing

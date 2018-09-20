@@ -96,7 +96,7 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
   else:
     manyPattern = pattern[1][0]
     name = pattern[1][1][1]
-  echo "LOAD:", pattern.lisprepr
+  #echo "LOAD:", pattern.lisprepr
   let inputNode = quote do: `input`[`i` .. ^1]
   let (itTest, itNode) = load(manyPattern, ident("it"), shape, capture)
   if not itNode.isNil:
@@ -105,7 +105,6 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
       # generates let name = inputNode.mapIt(code)
       if section.kind == nnkLetSection:
         for child in section:
-          echo child.lisprepr
           let childName = child[0]
           let childCode = child[2]
           let assign = quote:
@@ -126,7 +125,6 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
 
 # FAITH
 proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (NimNode, NimNode) =
-  echo &"PATTERN {pattern.lisprepr}"
   var test: NimNode
   var newCode: NimNode
   case pattern.kind:
@@ -143,7 +141,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     let newName = pattern[1][1]
     let tmpNode = ident("tmp" & $tmp)
     let newInit = quote do:
-      let `newName` = `tmpNode`
+      let `newName` = `input`
     newCode.add(newInit)
   
   of nnkPar:
@@ -246,6 +244,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       else:
         error "pattern not supported"
     of "~":
+      
       # ~kind(object) a variant, generates field matches and uses eKind for now
       let kind = pattern[1][0]
       test = quote:
@@ -258,9 +257,14 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       let (childrenTest, childrenCode) = load(children, input, shape, capture)
       test = quote do: `test` and `childrenTest`
       newCode.add(childrenCode)
+    # - number
+    of "-":
+      test = quote do: `input` == `pattern`
+      newCode = emptyStmtList()
     else:
       error "pattern not supported"
   of nnkObjConstr:
+
     # call(args), it calls the function and checks if it matches args
     # generates
     #
@@ -272,7 +276,10 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     #
     let typ = pattern[0]
     let call = typ
-    let condition = quote:
+    let condition2 = quote:
+      `typ` is enum
+    
+    let condition1 = quote:
       `typ` is type
 
     var args = nnkPar.newTree()
@@ -281,7 +288,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
         args.add(arg)
     tmpCount += 1
     var tmp = tmpCount
-    var (leftTest, leftCode) = loadUnpacker(call, args, input, shape, tmpCount)
+    var (test0, code0) = loadUnpacker(call, args, input, shape, tmpCount)
 
     # Type(fields), it checks if the type is matched and then it checks the fields
     # generates
@@ -292,38 +299,122 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     # no code
     #
     # 
-    var rightTest = quote do: `input` is `typ`
+    var test1 = quote do: `input` is `typ`
     var fields = nnkPar.newTree()
     for i, field in pattern:
       if i > 0:
         fields.add(field)
     let (fieldTest, fieldCode) = load(fields, input, shape, capture)
-    test = quote do: `test` and `fieldTest`
-    var rightCode = fieldCode
-    while rightCode.kind == nnkStmtList and rightCode.len == 1:
-      rightCode = rightCode[0]
-    if rightCode.len == 0:
-      rightCode = quote:
+    test1 = quote do: `test1` and `fieldTest`
+    var code1 = fieldCode
+    while code1.kind == nnkStmtList and code1.len == 1:
+      code1 = code1[0]
+    if code1.len == 0:
+      code1 = quote:
         discard
+
+    # enum
+    let kind = pattern[0]
+    var test2 = quote:
+      `input`.eKind == `kind`
+    var code2 = emptyStmtList()
+    var children = nnkPar.newTree()
+    newCode = emptyStmtList()
+    for i, field in pattern:
+      if i > 0:
+        children.add(field)
+    let (childrenTest, childrenCode) = load(children, input, shape, capture)
+    test2 = quote do: `test2` and `childrenTest`
+    code2.add(childrenCode)
+    
+    
     # :)
     test = quote:
-      when not `condition`: `leftTest` else: `rightTest`
+      when `condition2`: 
+        `test2`
+      elif `condition1`:
+        `test1`
+      else:
+        `test0`
+    
     newCode = quote:
-      when not `condition`: `leftCode` else: `rightCode`
+      when `condition2`:
+        `code2`
+      elif `condition1`:
+        `code1`
+      else:
+        `code0`
     newCode = nnkStmtList.newTree(newCode)
   of nnkCall:
-    # call(args), it calls the function and checks if it matches args
+    
+    # call(args), if call is an object, calls unpack(object) if it exists otherwise calls the function and checks if it matches args
     # generates
     #
     #
-    # unpacker(call, args) # test
+    # unpack(call) check args or unpacker(call, args) # test
     #
     #
     let call = pattern[0]
-    var args = pattern[1]
+    
+    let condition = quote:
+      not compiles(unpack(`input`))
+
+    var test0: NimNode
+    var newCode0: NimNode
     tmpCount += 1
     var tmp = tmpCount
-    (test, newCode) = loadUnpacker(call, args, input, shape, tmp)
+    if pattern.len > 1:
+      var args = pattern[1]
+      (test0, newCode0) = loadUnpacker(call, args, input, shape, tmp)
+    else:
+      test0 = quote do: false
+      newCode0 = quote:
+        discard
+
+    let length = newLit(pattern.len - 1)
+    var tmpNode = ident("tmp" & $tmp)
+    var header = quote:
+      let `tmpNode` = unpack(`input`)
+    
+    var test1 = quote do:`tmpNode`.len == `length`
+    var newCode1 = emptyStmtList()
+
+    for j in 0 ..< pattern.len - 1:
+      let argInput = quote do: `tmpNode`[`j`]
+      let (argTest, argCode) = load(pattern[j + 1], argInput, shape, capture)
+      test1 = quote do: `test1` and `argTest`
+      newCode1.add(argCode)
+      
+    for i, code in @[newCode0, newCode1]:
+      var c = code
+      while c.kind == nnkStmtList and c.len == 1:
+        c = c[0]
+      if c.kind == nnkStmtList and c.len == 0:
+        c = quote:
+          discard
+      if i == 0:
+        newCode0 = c
+      else:
+        newCode1 = c
+
+    test1 = quote:
+      `header`
+      (when `call` is enum: `input`.eKind == `call` else: `input` is `call`) and `test1`
+
+    test = quote:
+      when `condition`:
+        `test0`
+      else:
+        `test1`
+    
+    newCode = quote:
+      when `condition`:
+        `newCode0`
+      else:
+        `newCode1`
+
+    newCode = nnkStmtList.newTree(newCode)
+
   of nnkIdent:
     case pattern.repr:
     of "_":
@@ -338,7 +429,14 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       test = quote do: true
       newCode = emptyStmtList()
     else:
-      error "pattern not supported"
+      test = quote:
+        when `pattern` is enum:
+          `input`.eKind == `pattern`
+        elif `pattern` is type:
+          `input` is `pattern`
+        else:
+          `input` == `pattern`
+      newCode = emptyStmtList()
   else:
     error "pattern not supported"
   (test, newCode)
@@ -351,11 +449,12 @@ proc matchBranch(branch: NimNode, input: NimNode, shape: Shape, capture: int = -
     var (test, newCode) = load(pattern, input, shape, capture)
     newCode.add(code)
     result = (nnkElIfBranch.newTree(test, newCode), false)
-    echo &"PATTERN {result.repr}"
   of nnkElse:
     result = (nnkElse.newTree(branch[0]), true)
   else:
     error "expected of or else"
+  #echo result[0].repr
+  #echo "="
 
 proc loadKindField(t: NimNode): NimNode =
   var u = t
@@ -396,7 +495,6 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
   else:
     let t = input.getType
     let shape = loadShape(input)
-    echo &"MATCH: {shape}"
 
     result = nnkIfStmt.newTree()
     var hasElse = false
@@ -411,14 +509,6 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
         raise newException(ExperimentError, "nothing matched in pattern expression")
       exception = nnkElse.newTree(exception)
       result.add(exception)
-    echo &"MATCH:\n {result.repr}"
-
-    let test = quote do: a == 2
-    let code = quote do: echo a
-
-    let i = nnkIfStmt.newTree(nnkElifBranch.newTree(test, code))
-
-    echo i.lisprepr
 
 
 

@@ -162,9 +162,9 @@ suite "match":
     let a = ~Commit.Normal(message: "e", diff: "z")
 
     match(a):
-    of ~Merge(original: @original, other: @other):
+    of Merge(original: @original, other: @other):
       fail()
-    of ~Normal(message: @message):
+    of Normal(message: @message):
       check(message == "e")
     else:
       fail()
@@ -229,9 +229,3 @@ suite "kind":
 
     commit = ~Commit.Merge(original: commit, other: commit)
     check(commit.original.message == "e")
-
-
-# ~Commit.Merge(original: ~Commit.Normal(message: "e"), other: ~Commit.Normal(message: "f"))
-# ^Commit.Merge(original: ^Commit.Normal(message: "e"), other: ^Commit.Normal(message: "f"))
-# &Commit.Merge(original: &Commit.Normal(message: "e"), other: &Commit.Normal(message: "f"))
-# %Commit.Merge(original: %Commit.Normal(message: "e"), other: %Commit.Normal(message: "f"))

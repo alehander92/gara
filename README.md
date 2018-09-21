@@ -39,7 +39,8 @@ Matching
 * match many elements in seq with `*`
 * two kinds of custom unpackers (thanks to @krux02 for making me aware of the scala pattern matching design and apply/unapply: they work differently here though)
 * support for recognizing other types as variant(to support NimNode)
-* DSL for init variants with `~Variant.Kind(fields)`
+* if guards
+* unification
 
 ### Values
 
@@ -238,15 +239,39 @@ test:
 
 It's still not perfects, as we need a better syntax for passing ident("f") etc but we're getting there
 
+### If guards
+
+```nim
+match(a);
+of (b: @e) and e == 4:
+  echo e
+else:
+  echo -1
+```
+
+We can add `or` too: does it make sense?
+
+### Unification
+
+inspired by @andreaferretti's patty ideas
+
+```nim
+let a = @[0, 0]
+match(a):
+of @[@x, @x]:
+  echo "equal"
+else:
+  echo "not"
+```
+
+We check if all the subvalues are equal: that wasn't very easy to implement
+
 ### Matching more
 
-We are close to adding some more features: 
-  * unification (again inspired by @andreaferretti's patty ideas)
-  * if guard
+Match expression
 
-Unification should be relatively simple to implement, for now just making sure several subvalues are equal.
+Error handling
 
-If guards would probably use `of ... and test` syntax, we might also add support for `or`, but I am not sure it's very useful
 
 
 ### Goals

@@ -2,7 +2,7 @@
 # exports the main API in this file. Note that you cannot rename this file
 # but you can remove it if you wish.
 
-import macros, strformat, strutils, sequtils, tables, algorithm
+import macros, strformat, strutils, sequtils, tables, algorithm, sets
 
 proc add*(x, y: int): int =
   ## Adds two files together.
@@ -37,6 +37,23 @@ proc text(shape: Shape, depth: int): string =
 proc `$`*(shape: Shape): string =
   text(shape, 0)
 
+var assignNames {.compileTime.} = @[initSet[string]()]
+
+proc genAssign*(name: NimNode, a: NimNode): NimNode =
+  let text = name.repr
+  if assignNames.len == 0 or assignNames.allIt(text notin it):
+    result = quote:
+      let `name` = `a`; true
+    if assignNames.len == 0:
+      assignNames.add(initSet[string]())
+    echo assignNames[^1]
+    var e = assignNames[^1]
+    e.incl(text)
+    assignNames[^1] = e
+  else:
+    result = quote:
+      `name` == `a`
+
 proc `==`*(l: Shape, r: Shape): bool =
   if l.kind != r.kind:
     return false
@@ -54,11 +71,9 @@ proc atomTest(a: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode)
   result[1] = emptyStmtList()
   if capture > -1:
     let tmp = ident("tmp" & $capture)
-    let tmpInit = quote:
-      let `tmp` = `input`
+    let tmpInit = genAssign(tmp, input)
     result[1].add(tmpInit)
-    let testInit = quote:
-      `tmpInit`; true
+    let testInit = tmpInit
     let r = result[0]
     result[0] = quote:
       `r` and `testInit`
@@ -77,7 +92,7 @@ proc isManyPattern(node: NimNode): bool =
   node.kind == nnkPrefix and node[0].repr == "*" #or
     #node.kind == nnkCommand and node[0].isManyPattern and node[1].kind == nnkPrefix and node[1][0].repr == "@"
 
-var tmpCount = 0
+var tmpCount {.compileTime.} = 0
 
 proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (NimNode, NimNode)
 proc loadUnpacker(call: NimNode, pattern: NimNode, input: NimNode, shape: Shape, tmp: int): (NimNode, NimNode) =
@@ -104,16 +119,22 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
   #echo "LOAD:", pattern.lisprepr
   let inputNode = quote do: `input`[`i` .. ^1]
   let (itTest, itNode) = load(manyPattern, ident("it"), shape, capture)
-  if not itNode.isNil:
-    for section in itNode:
+
+  if not itTest.isNil:
+    for section in itTest:
+      echo section.lisprepr
       # let name = code
       # generates let name = inputNode.mapIt(code)
       if section.kind == nnkLetSection:
         for child in section:
           let childName = child[0]
           let childCode = child[2]
-          let assign = quote:
-            let `childName` = `inputNode`.mapIt(`childCode`)
+          let b = quote do: `inputNode`.mapIt(`childCode`)
+          # we forget childName
+          var a = assignNames[^1]
+          a.excl(childName.repr)
+          assignNames[^1] = a
+          let assign = genAssign(childName, b)
           newCode.add(assign)
             
 
@@ -124,13 +145,12 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
       `inputNode`.allIt(`itTest`)
   if newCode.len != 0:
     test = quote:
-      `test` and (`newCode`; true)
+      `test` and `newCode`
   if not name.isNil:
     # slow, we need views for zero overhead: https://github.com/nim-lang/Nim/issues/5753  
-    let assign = quote:
-      let `name` = `inputNode`
+    let assign = genAssign(name, inputNode)
     test = quote:
-      `test` and (`assign`; true)
+      `test` and `assign`
   result = (test, newCode, 0)
 
 # FAITH
@@ -150,11 +170,10 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     (test, newCode) = load(pattern[0], input, shape, tmp)
     let newName = pattern[1][1]
     let tmpNode = ident("tmp" & $tmp)
-    let newInit = quote do:
-      let `newName` = `input`
+    let newInit = genAssign(newName, input)
     newCode.add(newInit)
     let testInit = quote:
-      `newInit`; true
+      `newInit`
     test = quote do: `test` and `testInit`
   of nnkPar:
     # (a: c, b: d) a pattern that matches objects or tuples
@@ -209,11 +228,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
         #
       
         let name = pattern[1]
-        test = quote do: true
-        newCode = quote:
-          let `name` = `input`
-        test = quote:
-          `newCode`; true
+        test = genAssign(name, input)
 
       of nnkBracket:
         # @list a sequence match: it matches its elements
@@ -303,7 +318,12 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
         args.add(arg)
     tmpCount += 1
     var tmp = tmpCount
+      
+    var branchNames = initSet[string]()
+    # we only let new variables here, and then add them at the end, so you don't stop letting them in other
+    assignNames.add(initSet[string]())
     var (test0, code0) = loadUnpacker(call, args, input, shape, tmpCount)
+    branchNames.incl(assignNames.pop())
 
     # Type(fields), it checks if the type is matched and then it checks the fields
     # generates
@@ -319,7 +339,9 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     for i, field in pattern:
       if i > 0:
         fields.add(field)
+    assignNames.add(initSet[string]())
     let (fieldTest, fieldCode) = load(fields, input, shape, capture)
+    branchNames.incl(assignNames.pop())
     test1 = quote do: `test1` and `fieldTest`
     var code1 = fieldCode
     while code1.kind == nnkStmtList and code1.len == 1:
@@ -338,10 +360,17 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     for i, field in pattern:
       if i > 0:
         children.add(field)
+    assignNames.add(initSet[string]())
     let (childrenTest, childrenCode) = load(children, input, shape, capture)
+    branchNames.incl(assignNames.pop())
     test2 = quote do: `test2` and `childrenTest`
     code2.add(childrenCode)
     
+    if assignNames.len == 0:
+      assignNames.add(initSet[string]())
+    var e = assignNames[^1]
+    e.incl(branchNames)
+    assignNames[^1] = e
     
     # :)
     test = quote:
@@ -472,6 +501,7 @@ proc matchBranch(branch: NimNode, input: NimNode, shape: Shape, capture: int = -
   of nnkOfBranch:
     let pattern = branch[0]
     let code = branch[1]
+    assignNames = @[]
     var (test, newCode) = load(pattern, input, shape, capture)
     newCode = code #.add(code)
     result = (nnkElIfBranch.newTree(test, newCode), false)
@@ -480,7 +510,7 @@ proc matchBranch(branch: NimNode, input: NimNode, shape: Shape, capture: int = -
   else:
     error "expected of or else"
   echo result[0].repr
-  echo "="
+  echo "#"
 
 proc loadKindField(t: NimNode): NimNode =
   var u = t
@@ -535,7 +565,8 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
         raise newException(ExperimentError, "nothing matched in pattern expression")
       exception = nnkElse.newTree(exception)
       result.add(exception)
-
+    echo result.repr
+    echo "##"
 
 
 export sequtils

@@ -151,6 +151,16 @@ suite "match":
     else:
       fail()
 
+  test "unification":
+    let b = @["nim", "nim", "c++"]
+
+    match(b):
+    of @[@x, @x, @x]:
+      fail()
+    of @[@x, @x, _]:
+      check(x == "nim")
+    else:
+      fail()
 suite "kind":
   test "dsl":
     var commit = ~Commit.Normal(message: "e", diff: "z")
@@ -158,4 +168,6 @@ suite "kind":
 
     commit = ~Commit.Merge(original: commit, other: commit)
     check(commit.original.message == "e")
+
+
 

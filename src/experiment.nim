@@ -452,6 +452,17 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
         else:
           `input` == `pattern`
       newCode = emptyStmtList()
+  of nnkInfix:
+    let operator = pattern[0].repr
+    case operator:
+    of "and":
+      var (a, b) = load(pattern[1], input, shape, capture)
+      let condition = pattern[2]
+      test = quote:
+        `a` and `condition`
+      newCode = emptyStmtList()
+    else:
+      error "pattern not supported"
   else:
     error "pattern not supported"
   (test, newCode)

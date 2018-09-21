@@ -141,6 +141,16 @@ suite "match":
       fail()
     of tokens(@[_, _, _, _, @token]):
       check(token == "org")
+
+  test "if":
+    let b = @[4, 0]
+
+    match(b):
+    of @[_, @t] and t mod 2 == 0:
+      check(t == 0)
+    else:
+      fail()
+
 suite "kind":
   test "dsl":
     var commit = ~Commit.Normal(message: "e", diff: "z")
@@ -148,3 +158,4 @@ suite "kind":
 
     commit = ~Commit.Merge(original: commit, other: commit)
     check(commit.original.message == "e")
+

@@ -57,6 +57,11 @@ proc atomTest(a: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode)
     let tmpInit = quote:
       let `tmp` = `input`
     result[1].add(tmpInit)
+    let testInit = quote:
+      `tmpInit`; true
+    let r = result[0]
+    result[0] = quote:
+      `r` and `testInit`
 
 proc loadShape(input: NimNode): Shape =
   let t = input.getType
@@ -110,17 +115,22 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
           let assign = quote:
             let `childName` = `inputNode`.mapIt(`childCode`)
           newCode.add(assign)
+            
 
   if itTest.repr == "true":
     test = itTest # optimized
   else:
     test = quote:
       `inputNode`.allIt(`itTest`)
+  if newCode.len != 0:
+    test = quote:
+      `test` and (`newCode`; true)
   if not name.isNil:
     # slow, we need views for zero overhead: https://github.com/nim-lang/Nim/issues/5753  
     let assign = quote:
       let `name` = `inputNode`
-    newCode.add(assign)
+    test = quote:
+      `test` and (`assign`; true)
   result = (test, newCode, 0)
 
 # FAITH
@@ -143,7 +153,9 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     let newInit = quote do:
       let `newName` = `input`
     newCode.add(newInit)
-  
+    let testInit = quote:
+      `newInit`; true
+    test = quote do: `test` and `testInit`
   of nnkPar:
     # (a: c, b: d) a pattern that matches objects or tuples
     # generates:
@@ -200,6 +212,9 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
         test = quote do: true
         newCode = quote:
           let `name` = `input`
+        test = quote:
+          `newCode`; true
+
       of nnkBracket:
         # @list a sequence match: it matches its elements
         # generates:
@@ -447,14 +462,14 @@ proc matchBranch(branch: NimNode, input: NimNode, shape: Shape, capture: int = -
     let pattern = branch[0]
     let code = branch[1]
     var (test, newCode) = load(pattern, input, shape, capture)
-    newCode.add(code)
+    newCode = code #.add(code)
     result = (nnkElIfBranch.newTree(test, newCode), false)
   of nnkElse:
     result = (nnkElse.newTree(branch[0]), true)
   else:
     error "expected of or else"
-  #echo result[0].repr
-  #echo "="
+  echo result[0].repr
+  echo "="
 
 proc loadKindField(t: NimNode): NimNode =
   var u = t

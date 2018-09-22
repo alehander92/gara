@@ -545,6 +545,12 @@ macro `~`*(node: untyped): untyped =
   result = quote:
     initVariant(`a`, `b`, `fields`)
 
+macro matches*(input: untyped, pattern: untyped): untyped =
+  echo input.repr
+  echo pattern.repr
+  let (test, newCode) = load(pattern, input, Shape(kind: MAtom), -1)
+  result = test
+
 macro match*(input: typed, branches: varargs[untyped]): untyped =
   if branches.len == 0:
     error "invalid match"

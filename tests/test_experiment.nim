@@ -161,6 +161,17 @@ suite "match":
       check(x == "nim")
     else:
       fail()
+
+suite "matches":
+  test "bool":
+    let a = Rectangle(a: 0, b: 0)
+
+    if a.matches((b: 0)):
+      check(true)
+    else:
+      fail()
+
+
 suite "kind":
   test "dsl":
     var commit = ~Commit.Normal(message: "e", diff: "z")

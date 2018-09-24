@@ -1,5 +1,5 @@
 import unittest
-import experiment, strformat, strutils, sequtils, options
+import gara, strformat, strutils, sequtils, options
 
 type
   Rectangle = object

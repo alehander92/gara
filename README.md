@@ -1,11 +1,14 @@
-# nim-experiment
+# gara
 
 A nim macro-based pattern matching library.
 
 ### DSL
 
-A library that provides a `match` macro which can be used as a pattern matching multibranch construct.
-A `matches` macro which returns true if a value is matched. A `maybeMatches` macro which returns an `Option[tuple]` of the matched "variables".
+A library that provides a `match` macro which can be used as a pattern matching construct.
+
+A `matches` macro which returns true if a value is matched. 
+
+A `maybeMatches` macro which returns an `Option[tuple]` of the matched "variables".
 
 
 ```nim
@@ -78,10 +81,10 @@ matchDebug(a): # generates an error message describing the comparisons we had an
 
 # or
 
-echo lastMatchError() # if we detect this call, we generate an error message: we don't do it by default to not slow down the code
+lastMatchError() # if we detect this call, we generate an error message: we don't do it by default to not slow down the code
 ```
 
-With enough discipline we can generate pretty readable code from our macro.
+With some discipline we can generate pretty readable code from our macro.
 This would be also beneficial for the end user, as we can map his invocation with the generated code and help him
 see the problem easily.
 
@@ -327,6 +330,10 @@ if c.isSome:
 
 * error reporting
 * fixes
+
+### Name
+
+gara means a train station in bulgarian. why a train station? I am travelling with trains these days, and I like bulgarian words.
 
 ### Questions and answers
 

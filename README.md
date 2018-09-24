@@ -12,15 +12,11 @@ A `maybeMatches` macro which returns an `Option[tuple]` of the matched "variable
 
 
 ```nim
-
-test "Object":
-  let a = Rectangle(a: 2, b: 0)
-
-  match(a):
-  of (a: 4, b: 1):
+match(a):
+  of @[]:
     fail()
-  of (a: 2, b: @b):
-    check(b == 0)
+  of @[_, *(a: 4, b: 4) @others]:
+    check(others == a[1 .. ^1])
   else:
     fail()
 ```

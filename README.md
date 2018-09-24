@@ -129,10 +129,12 @@ Of course you can still add the type if you want. You can use this for tuples to
 You can pass just some of the fields!
 
 ```nim
-match(a):
-of (a: 0, b: 0):
+var rectangle = Rectangle(a: 0, b: 0)
+
+match(rectangle):
+of (a: 0, b: 0): # Rectangle(a: 0, b: 0)
   echo "ok"
-of Rectangle(a: -2):
+of Rectangle(a: -2): # matches Rectangle(a: -2) (a: -2, e: 4)
   echo "weird"
 else:
   echo 0

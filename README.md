@@ -114,7 +114,7 @@ The library tests with `is`
 
 ```nim
 match(a):
-of Rectangle:
+of Rectangle: # matches Rectangle(a: 0), Rectangle(a: 2, b: 4)
   echo "rectangle"
 else:
   echo "other"
@@ -132,7 +132,7 @@ You can pass just some of the fields!
 var rectangle = Rectangle(a: 0, b: 0)
 
 match(rectangle):
-of (a: 0, b: 0): # Rectangle(a: 0, b: 0)
+of (a: 0, b: 0): # matches Rectangle(a: 0, b: 0)
   echo "ok"
 of Rectangle(a: -2): # matches Rectangle(a: -2) (a: -2, e: 4)
   echo "weird"
@@ -145,6 +145,7 @@ else:
 You can match subpatterns.
 
 ```nim
+var a = A(b: B(c: 0, e: 2))
 match(a):
 of A(b: B(c: 0)):
   echo "ok"
@@ -159,7 +160,7 @@ You write `stuff @name` which shouldn't be ambigious in general(please read the 
 
 ```nim
 match(a):
-of C(e: E(f: @f) @e):
+of C(e: E(f: @f) @e): # matches C(e: E(f: 0)) and creates local variables f = 0 and e = E(..)
   echo e
   echo f
 else:
@@ -186,7 +187,7 @@ You can use `_` as a wildcard, it always succeeds.
 
 ```nim
 match(a):
-of _:
+of _: # matches any value
   echo a
 else:
   echo "nope"
@@ -196,7 +197,7 @@ else:
 
 ```nim
 match(a):
-of @[4, 5]:
+of @[4, 5]: # matches @[4, 5]
   echo "ok"
 else:
   echo "no"
@@ -207,8 +208,9 @@ else:
 You can match repeated properties
 
 ```nim
+var rectangles = @[e, e, Rectangle(a: 0)]
 match(a):
-of @[_, _, *(a: @list)]:
+of @[_, _, *(a: @list)]: # creates a local variable list which collects the a fields in the matches elements : @[0]
   echo list
 else:
   echo @[]
@@ -257,9 +259,9 @@ proc tokens(email: Email): seq[string] =
     result.add(token)
 
 match(email):
-of data(name: "academy"):
+of data(name: "academy"): # matches data(email) with (name: "academy")
   echo email
-of tokens(@[_, _, _, _, @token]):
+of tokens(@[_, _, _, _, @token]): # matches tokens(email)
   echo token
 ```
 
@@ -279,7 +281,7 @@ proc eKind*(a: A): AKind =
 
 ```nim
 match(a);
-of (b: @e) and e == 4:
+of (b: @e) and e == 4: # generates local variable e and checks e
   echo e
 else:
   echo -1
@@ -294,7 +296,7 @@ inspired by @andreaferretti's patty ideas
 ```nim
 let a = @[0, 0]
 match(a):
-of @[@x, @x]:
+of @[@x, @x]: # creates a local variable x only if both values are equal
   echo "equal"
 else:
   echo "not"

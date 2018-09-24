@@ -1,5 +1,5 @@
 import unittest
-import experiment, strformat, strutils, sequtils
+import experiment, strformat, strutils, sequtils, options
 
 type
   Rectangle = object
@@ -162,6 +162,15 @@ suite "match":
     else:
       fail()
 
+  test "option":
+    let a = some[int](3)
+
+    match(a):
+    of Some(@i):
+      check(i == 3)
+    else:
+      fail()
+
 suite "matches":
   test "bool":
     let a = Rectangle(a: 0, b: 0)
@@ -170,6 +179,15 @@ suite "matches":
       check(true)
     else:
       fail()
+
+  test "option":
+    let a = Rectangle(a: 0, b: 0)
+
+    let c = a.maybeMatches((a: @a, b: @b))
+    check(c.isSome)
+    let g = c.get
+    check(g.a == 0)
+    check(g.b == 0)
 
 
 suite "kind":

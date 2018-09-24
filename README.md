@@ -1,14 +1,12 @@
 # nim-experiment
 
-# DON'T USE, NOT READY
-README and project in progress
-
-
-An experiment in building a nim macro-based pattern matching library.
+A nim macro-based pattern matching library.
 
 ### DSL
 
-A macro `match` generates an if construct for now.
+A library that provides a `match` macro which can be used as a pattern matching multibranch construct.
+A `matches` macro which returns true if a value is matched. A `maybeMatches` macro which returns an `Option[tuple]` of the matched "variables".
+
 
 ```nim
 
@@ -24,6 +22,9 @@ test "Object":
     fail()
 ```
 
+It's still experimental, there are some bugs left and the design of the DSL might still change depending on feedback of the community. For now it's a personal project, but I'd love if other people would join as contributors. It's inspired by @andreaferretti 's [patty](https://github.com/andreaferretti/patty) and @krux02 's [ast-pattern-matching](https://github.com/krux02/ast-pattern-matching) (and more stuff, there is a credits section!)
+
+
 ### Features
 
 Matching 
@@ -38,13 +39,63 @@ Matching
 * seq
 * match many elements in seq with `*`
 * two kinds of custom unpackers (thanks to @krux02 for making me aware of the scala pattern matching design and apply/unapply: they work differently here though)
-* support for recognizing other types as variant(to support NimNode)
+* support for recognizing other types as variant
 * if guards
 * unification
+* matches expression
+* option matching
+
+### Rationale
+
+
+Goals:
+
+* Ability to generate code with zero overhead compared to manually written if/case/for equivalents
+* Expressive and flexible syntax for patterns and extensible hooks
+* Nice error reporting and pretty understandable generated code
+
+The goals are ordered by priority. 
+
+Speed is very important: the goal is to be able to use matching everywhere where you'd use a complicated `if`/`case`.
+If there are cases, when we're slower:
+
+This should be considered a bug.
+
+or
+
+This is a limitation of the library: which is not cool.
+
+Currently not every feature is optimized well(there are some blockers, and some features are still experimental).
+
+
+The library is supposed to be extensible: please take a look at the unpackers section. For example we already implement the option matching with a `Some` unpacker.
+
+I have a plan about the error reporting part: basically with several hooks inside the current code we should be able to produce 
+good messages. My plan API is
+
+```nim
+matchDebug(a): # generates an error message describing the comparisons we had and raises it if we hit unimplemented else
+
+# or
+
+echo lastMatchError() # if we detect this call, we generate an error message: we don't do it by default to not slow down the code
+```
+
+With enough discipline we can generate pretty readable code from our macro.
+This would be also beneficial for the end user, as we can map his invocation with the generated code and help him
+see the problem easily.
+
+There are 3 cases:
+
+* The user had a logical error in his patterns: easily seen with the generated code
+* The user used a pattern in an unexpected way: this way he can see how its expansion differs from his expectation
+* Our patterns worked incorrectly: the user can issue a bug
+
+
 
 ### Values
 
-Just test for equality with the value. Works also if you pass an existing variable instead of 2
+Just test for equality with the value. Works also if you pass an existing variable instead of 2. For now you can't just pass various expressions tho (2 + 2), as I want to reserve syntax for the patterns
 
 ```nim
 let a = 2
@@ -167,12 +218,12 @@ We use `allIt` for the test, but in a case like this, we optimize it out, as it 
 ### Unpackers
 
 We can have unpackers for types: you define `proc unpack(t: Type): T` for your type.
-The powerful thing is, `T` can be anything that has a len and `[int]`(we will add a concept for that later).
-For example we do this for NimNode
+The powerful thing is, `T` can be anything that has a len and `[int]`(we will add a concept for that later, but it covers seq, tuple).
+For example we do this for Rectangle
 
 ```nim
-proc unpack(node: NimNode): NimNode =
-  node
+proc unpack(rectangle: Rectangle): seq[int] =
+  @[rectangle.a, rectangle.b]
 ```
 
 Of course we are lucky here, but you can do transformations for more complicated cases.
@@ -180,7 +231,7 @@ Of course we are lucky here, but you can do transformations for more complicated
 When you do this, you can use the unpacked values like `Type(value, value)` .
 We even recognize the enum case, so you can do it for variants too.
 
-we also have function unpackers: `proc name(t: Type): T`. This way you can have many unpackers for the same type.
+we also have function unpackers: `proc name(t: Type): T`. This way you can have many unpackers for the same type. This is useful , especially if a builtin type already has a default unpacker, and you need a custom one.
 You match passing them as calls with their expected values: `name(res)`
 
 ```nim
@@ -218,26 +269,9 @@ Sometimes a type acts like a variant, but isn't defined like one: you can teach 
 It uses internally `eKind` to get the kind field of a variant, so you just need to override it
 
 ```nim
-proc eKind*(node: NimNode): NimNodeKind =
-  node.kind
+proc eKind*(a: A): AKind =
+  a.stuff
 ```
-
-With this and unpack you can match NimNode now
-```nim
-macro test(node: untyped): untyped =
-  let code = node[0]
-  let q = ident("f")
-  match code:
-  of nnkCall(q, nnkIntLit @i):
-    echo i.repr
-  else:
-    echo ""
-
-test:
-  f(2)
-```
-
-It's still not perfects, as we need a better syntax for passing ident("f") etc but we're getting there
 
 ### If guards
 
@@ -266,53 +300,33 @@ else:
 
 We check if all the subvalues are equal: that wasn't very easy to implement
 
-### Matching more
+### Match
 
-Match expression
+You can have matches as an expression: it returns a boolean value which is `true` when it matches the value.
 
-Error handling
+```nim
+if a.matches((b: 2, c: 4)):
+  echo 0
 
+let e = a.matches((b: 2, c: @c))
+if e.isSome:
+  echo e.c
+```
 
+You can also have captures with maybeMatch: it returns an `Option[tuple]`.
 
-### Goals
+```nim
+let c = a.matches((a: @a, b: @b))
+if c.isSome:
+  echo c.a
+  echo c.b
+```
 
-* Ability to generate code with zero overhead compared to manually written if/case/for equivalents
-* Expressive and flexible syntax for patterns
-* Nice error reporting based on understandable generated code
-
-The goals are ordered by priority. 
-
-Speed is very important: the goal is to be able to use matching everywhere where you'd use a complicated `if`/`case`.
-If there are cases, when we're slower:
-
-This should be considered a bug.
-
-or
-
-This is a limitation of the library: which is not cool.
-
-Currently not every feature is optimized well(there are some blockers, and some features are still experimental)
-
-With enough discipline we can generate pretty readable code from our macro.
-This would be very beneficial for the end user, as we can map his invocation with the generated code and help him
-see the problem easily.
-
-It's not always possible to directly produce nice code, so sometimes we'll delegate to other macros.
-Still, maybe we can make their code also visible in debug mode, so the user still knows what happened
-
-
-There are 3 cases:
-
-* The user had a logical error in his patterns: easily seen with the generated code
-* The user used a pattern in an unexpected way: this way he can see how its expansion differs from his expectation
-* Our patterns worked incorrectly: the user can issue a bug
-
-We also need to add a `matches` abstraction that one can use either with capture arg as in [timotheecour idea](https://github.com/nim-lang/Nim/issues/8649#issuecomment-413323627 ) or as something that returns options
 
 ### Plan
 
-* if guards
 * error reporting
+* fixes
 
 ### Questions and answers
 

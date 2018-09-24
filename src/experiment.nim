@@ -2,42 +2,18 @@
 # exports the main API in this file. Note that you cannot rename this file
 # but you can remove it if you wish.
 
-import macros, strformat, strutils, sequtils, tables, algorithm, sets
+import macros, strformat, strutils, sequtils, tables, algorithm, sets, options
 
 proc add*(x, y: int): int =
   ## Adds two files together.
   return x + y
 
 type
-  ShapeKind = enum MAtom, MSeq, MSet, MTable, MObject
-
-  Shape = ref object
-    case kind: ShapeKind:
-    of MAtom:
-      name: string
-    of MSeq, MSet:
-      element: Shape
-    of MTable:
-      key: Shape
-      value: Shape
-    of MObject:
-      fields: Table[string, Shape]
-
   ExperimentError* = object of Exception
 
-proc text(shape: Shape, depth: int): string =
-  let indent = repeat("  ",  depth)
-  let base = case shape.kind:
-    of MAtom:
-      &"{shape.name}"
-    else:
-      &"shape"
-  result = &"{indent}{base}"
-
-proc `$`*(shape: Shape): string =
-  text(shape, 0)
-
 var assignNames {.compileTime.} = @[initSet[string]()]
+
+var maybeVariables {.compileTime.}: seq[string] = @[]
 
 proc genAssign*(name: NimNode, a: NimNode): NimNode =
   let text = name.repr
@@ -53,15 +29,8 @@ proc genAssign*(name: NimNode, a: NimNode): NimNode =
   else:
     result = quote:
       `name` == `a`
-
-proc `==`*(l: Shape, r: Shape): bool =
-  if l.kind != r.kind:
-    return false
-  case l.kind:
-  of MAtom:
-    l.name == r.name
-  else:
-    false
+  if not text.startsWith("tmp"): #TODO
+    maybeVariables.add(text)
 
 template emptyStmtList: NimNode =
   nnkStmtList.newTree()
@@ -78,15 +47,6 @@ proc atomTest(a: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode)
     result[0] = quote:
       `r` and `testInit`
 
-proc loadShape(input: NimNode): Shape =
-  let t = input.getType
-  case t.kind:
-  of nnkSym:
-    Shape(kind: MAtom, name: t.repr)
-  else:
-    Shape(kind: MSeq, element: nil)
-
-
 # detects *pattern and *pattern @name
 proc isManyPattern(node: NimNode): bool =
   node.kind == nnkPrefix and node[0].repr == "*" #or
@@ -94,10 +54,10 @@ proc isManyPattern(node: NimNode): bool =
 
 var tmpCount {.compileTime.} = 0
 
-proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (NimNode, NimNode)
-proc loadUnpacker(call: NimNode, pattern: NimNode, input: NimNode, shape: Shape, tmp: int): (NimNode, NimNode) =
+proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode)
+proc loadUnpacker(call: NimNode, pattern: NimNode, input: NimNode, tmp: int): (NimNode, NimNode) =
   let tmpNode = ident("tmp" & $tmp)
-  var (test, newCode) = load(pattern, tmpNode, shape, -1)
+  var (test, newCode) = load(pattern, tmpNode, -1)
   let firstCode = quote:
     let `tmpNode` = `call`(`input`)
   test = quote:
@@ -106,7 +66,7 @@ proc loadUnpacker(call: NimNode, pattern: NimNode, input: NimNode, shape: Shape,
   result = (test, newCode)
 
 # generates for *pattern and *pattern @name
-proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, capture: int = -1): (NimNode, NimNode, int) =
+proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1): (NimNode, NimNode, int) =
   var manyPattern: NimNode
   var name: NimNode
   var test: NimNode
@@ -118,7 +78,7 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
     name = pattern[1][1][1]
   #echo "LOAD:", pattern.lisprepr
   let inputNode = quote do: `input`[`i` .. ^1]
-  let (itTest, itNode) = load(manyPattern, ident("it"), shape, capture)
+  let (itTest, itNode) = load(manyPattern, ident("it"), capture)
 
   if not itTest.isNil:
     for section in itTest:
@@ -154,7 +114,7 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, shape: Shape, cap
   result = (test, newCode, 0)
 
 # FAITH
-proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (NimNode, NimNode) =
+proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode) =
   var test: NimNode
   var newCode: NimNode
   case pattern.kind:
@@ -167,7 +127,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       error "pattern expects @name"
     tmpCount += 1
     let tmp = tmpCount
-    (test, newCode) = load(pattern[0], input, shape, tmp)
+    (test, newCode) = load(pattern[0], input, tmp)
     let newName = pattern[1][1]
     let tmpNode = ident("tmp" & $tmp)
     let newInit = genAssign(newName, input)
@@ -201,7 +161,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       if not simple:
         let left = element[0]
         let newInput = quote do: `input`.`left`
-        let (elementTest, elementCode) = load(element[1], newInput, shape, capture)
+        let (elementTest, elementCode) = load(element[1], newInput, capture)
         if test.isNil:
           test = elementTest
         else:
@@ -252,14 +212,14 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
             var elementTest: NimNode
             var elementCode: NimNode
             if not element.isManyPattern():
-              (elementTest, elementCode) = load(element, elementNode, shape, capture)
+              (elementTest, elementCode) = load(element, elementNode, capture)
               min += 1
             else:
               if i != pattern[1].len - 1:
                 error "pattern expected * last"
               var elementMin = 0
               # Thank God!
-              (elementTest, elementCode, elementMin) = loadManyPattern(element, input, i, shape, capture)
+              (elementTest, elementCode, elementMin) = loadManyPattern(element, input, i, capture)
               # min is different for * and +
               # we generate sequtils allIt
               min += elementMin
@@ -284,7 +244,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       for i, field in pattern[1]:
         if i > 0:
           children.add(field)
-      let (childrenTest, childrenCode) = load(children, input, shape, capture)
+      let (childrenTest, childrenCode) = load(children, input, capture)
       test = quote do: `test` and `childrenTest`
       newCode.add(childrenCode)
     # - number
@@ -322,7 +282,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     var branchNames = initSet[string]()
     # we only let new variables here, and then add them at the end, so you don't stop letting them in other
     assignNames.add(initSet[string]())
-    var (test0, code0) = loadUnpacker(call, args, input, shape, tmpCount)
+    var (test0, code0) = loadUnpacker(call, args, input, tmpCount)
     branchNames.incl(assignNames.pop())
 
     # Type(fields), it checks if the type is matched and then it checks the fields
@@ -340,7 +300,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       if i > 0:
         fields.add(field)
     assignNames.add(initSet[string]())
-    let (fieldTest, fieldCode) = load(fields, input, shape, capture)
+    let (fieldTest, fieldCode) = load(fields, input, capture)
     branchNames.incl(assignNames.pop())
     test1 = quote do: `test1` and `fieldTest`
     var code1 = fieldCode
@@ -361,7 +321,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
       if i > 0:
         children.add(field)
     assignNames.add(initSet[string]())
-    let (childrenTest, childrenCode) = load(children, input, shape, capture)
+    let (childrenTest, childrenCode) = load(children, input, capture)
     branchNames.incl(assignNames.pop())
     test2 = quote do: `test2` and `childrenTest`
     code2.add(childrenCode)
@@ -409,7 +369,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     var tmp = tmpCount
     if pattern.len > 1:
       var args = pattern[1]
-      (test0, newCode0) = loadUnpacker(call, args, input, shape, tmp)
+      (test0, newCode0) = loadUnpacker(call, args, input, tmp)
     else:
       test0 = quote do: false
       newCode0 = quote:
@@ -425,7 +385,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
 
     for j in 0 ..< pattern.len - 1:
       let argInput = quote do: `tmpNode`[`j`]
-      let (argTest, argCode) = load(pattern[j + 1], argInput, shape, capture)
+      let (argTest, argCode) = load(pattern[j + 1], argInput, capture)
       test1 = quote do: `test1` and `argTest`
       newCode1.add(argCode)
       
@@ -485,7 +445,7 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     let operator = pattern[0].repr
     case operator:
     of "and":
-      var (a, b) = load(pattern[1], input, shape, capture)
+      var (a, b) = load(pattern[1], input, capture)
       let condition = pattern[2]
       test = quote:
         `a` and `condition`
@@ -496,13 +456,13 @@ proc load(pattern: NimNode, input: NimNode, shape: Shape, capture: int = -1): (N
     error "pattern not supported"
   (test, newCode)
 
-proc matchBranch(branch: NimNode, input: NimNode, shape: Shape, capture: int = -1): (NimNode, bool) =
+proc matchBranch(branch: NimNode, input: NimNode, capture: int = -1): (NimNode, bool) =
   case branch.kind:
   of nnkOfBranch:
     let pattern = branch[0]
     let code = branch[1]
     assignNames = @[]
-    var (test, newCode) = load(pattern, input, shape, capture)
+    var (test, newCode) = load(pattern, input, capture)
     newCode = code #.add(code)
     result = (nnkElIfBranch.newTree(test, newCode), false)
   of nnkElse:
@@ -528,6 +488,10 @@ macro eKind*(a: typed): untyped =
   result = quote:
     `a`.`kindField`
 
+# Faith Lord!
+proc Some*[T](a: Option[T]): T =
+  a.get
+
 macro initVariant*(variant: typed, kind: typed, fields: untyped): untyped =
   let kindField = loadKindField(variant.getType)
   result = quote:
@@ -548,20 +512,38 @@ macro `~`*(node: untyped): untyped =
 macro matches*(input: untyped, pattern: untyped): untyped =
   echo input.repr
   echo pattern.repr
-  let (test, newCode) = load(pattern, input, Shape(kind: MAtom), -1)
+  let (test, newCode) = load(pattern, input, -1)
   result = test
+
+
+macro maybeMatches*(input: untyped, pattern: untyped): untyped =
+  maybeVariables = @[]
+  let (test, newCode) = load(pattern, input, -1)
+  result = emptyStmtList()
+  let tupleInit = nnkPar.newTree()
+  for name in maybeVariables:
+    tupleInit.add(nnkExprColonExpr.newTree(ident(name), ident(name)))
+  maybeVariables = @[]
+  result = quote:
+    block:
+      let r = `test`
+      var tmp: Option[(`tupleInit`).type]
+      if r:
+        tmp = some(`tupleInit`)
+      else:
+        tmp = none[(`tupleInit`).type]()
+      tmp
 
 macro match*(input: typed, branches: varargs[untyped]): untyped =
   if branches.len == 0:
     error "invalid match"
   else:
     let t = input.getType
-    let shape = loadShape(input)
 
     result = nnkIfStmt.newTree()
     var hasElse = false
     for branch in branches:
-      let (b, isElse) = matchBranch(branch, input, shape)
+      let (b, isElse) = matchBranch(branch, input)
       if isElse:
         hasElse = true
       if not b.isNil:
@@ -575,5 +557,5 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
     echo "##"
 
 
-export sequtils
+export sequtils, options
 

@@ -340,9 +340,16 @@ I like it, but I'd welcome ideas for a better syntax! Please, first check this l
 * `expr @ name` I can't see how to make it consistent with the `(field: capture)` case, the same with other binary
 * `expr @ ``name`` ` I think this is more surprising, as it's used for 2 different puproses in quotes and in names
 
+**It's not type safe**
+
+I want to leave all the type checking to the Nim compiler. The library translates your patterns to Nim code, so the only problem should be that sometimes it might be hard to debug why something is failing: I'll try to improve that with error messages.
+
+**It is too complicated**
+
+I like to think it is relatively simple: I've tried to limit new syntax and to optimize it for variants, so e.g. in `name(..)` we first check if name is enum, then type, then we assume it might be an unpacker. In the beginning I even had `~enum` syntax for matching variants, but it seemed crazy.
+Otherwise a lot of custom or new functionality should be doable with unpackers or with a bit upgraded unpackers, please check them out
 
 ### Credits
-
 [@krux02](https://github.com/krux02/) and [@andreaferretti](https://github.com/andreaferretti) are authors of the original nim pattern matching libs:
 
 * @krux02 's [ast-pattern-matching](https://github.com/krux02/ast-pattern-matching)

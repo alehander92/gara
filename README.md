@@ -12,11 +12,13 @@ A `maybeMatches` macro which returns an `Option[tuple]` of the matched "variable
 
 
 ```nim
-match(a):
+var rectangles = @[Rectangle(a: 0, b: 2), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4)]
+
+match(rectangles):
   of @[]:
     fail()
-  of @[_, *(a: 4, b: 4) @others]:
-    check(others == a[1 .. ^1])
+  of @[_, *(a: 4, b: 4) @others]: # (a: 4, b: 4) is a shorthand for `TypeName(field: value)`, see the next examples
+    check(others == a[1 .. ^1]) # we match the rest, because they all match subpattern
   else:
     fail()
 ```
@@ -120,9 +122,8 @@ else:
 
 ### Objects
 
-We have a simpler syntax for objects.
-You can type only the fields, and then we check only them: this is a good idea because usually
-you know the type of the object that you are passing, so there is rarely ambiguity.
+We have a shorthand syntax for objects. You can type only the fields, and then we check only them: this is a good idea because usually
+you know the type of the object that you are passing, so there is rarely ambiguity. 
 Of course you can still add the type if you want. You can use this for tuples too.
 
 You can pass just some of the fields!

@@ -312,9 +312,6 @@ You can have matches as an expression: it returns a boolean value which is `true
 if a.matches((b: 2, c: 4)):
   echo 0
 
-let e = a.matches((b: 2, c: @c))
-if e.isSome:
-  echo e.c
 ```
 
 You can also have captures with maybeMatch: it returns an `Option[tuple]`.

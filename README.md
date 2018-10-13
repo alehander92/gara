@@ -1,4 +1,4 @@
-[![Build Status (Travis)](https://img.shields.io/travis/alehander42/gara/master.svg?) "build status")](https://travis-ci.org/alehander42/gara)
+[![Build Status (Travis)](https://img.shields.io/travis/alehander42/gara/master.svg "build status")](https://travis-ci.org/alehander42/gara)
 
 # gara
 

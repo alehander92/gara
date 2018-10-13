@@ -190,6 +190,31 @@ suite "match":
       check(c == "b")
     else:
       fail()
+  
+  test "ref":
+    type
+      Node = ref object
+        name: string
+        children: seq[Node]
+
+    let node = Node(name: "2")
+
+    match node:
+    of (name: @name):
+      check(name == "2")
+    else:
+      fail()
+
+    let node2: Node = nil
+
+    match node2:
+    of (name: "4"):
+      fail()
+    of Node(name: "4"):
+      fail()
+    else:
+      check(true)
+
 
 suite "matches":
   test "bool":

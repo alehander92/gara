@@ -80,15 +80,23 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
     name = pattern[1][1][1]
   #echo "LOAD:", pattern.lisprepr
   let inputNode = quote do: `input`[`i` .. ^1]
-  let (itTest, itNode) = load(manyPattern, ident("it"), capture)
+  var (itTest, itNode) = load(manyPattern, ident("it"), capture)
+
+  
+  var newItTest = itTest
 
   if not itTest.isNil:
-    for section in itTest:
-      # echo section.lisprepr
-      # let name = code
-      # generates let name = inputNode.mapIt(code)
-      if section.kind == nnkLetSection:
-        for child in section:
+    for i, section in itTest:
+      var l: NimNode = nil
+      if section.kind == nnkInfix and section[2].kind == nnkLetSection:
+        l = section[2]
+      elif section.kind == nnkStmtList and section[0].kind == nnkLetSection:
+        l = section[0]
+      elif section.kind == nnkLetSection:
+        l = section
+
+      if not l.isNil:
+        for child in l:
           let childName = child[0]
           let childCode = child[2]
           let b = quote do: `inputNode`.mapIt(`childCode`)
@@ -98,8 +106,17 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
           assignNames[^1] = a
           let assign = genAssign(childName, b)
           newCode.add(assign)
-            
 
+      if section.kind == nnkInfix and section[2].kind == nnkLetSection:
+        newItTest[i] = section[0]
+      elif section.kind == nnkStmtList and section[0].kind == nnkLetSection:
+        newItTest[i] = nnkStmtList.newTree()
+        for j, child in section:
+          if j > 0:
+            newItTest[i].add(child)
+
+  itTest = newItTest
+  
   if itTest.repr == "true":
     test = itTest # optimized
   else:
@@ -150,7 +167,8 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     # code
     #
     var simple = true
-    test = nil
+    test = quote do: not `input`.isNil2
+
     newCode = emptyStmtList()
     for i, element in pattern:
       if i == 0:
@@ -166,18 +184,18 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
         let left = element[0]
         let newInput = quote do: `input`.`left`
         let (elementTest, elementCode) = load(element[1], newInput, capture)
-        if test.isNil:
-          test = elementTest
-        else:
-          test = quote do: `test` and `elementTest`
+        #if test.isNil:
+        #   test = elementTest
+        #else:
+        test = quote do: `test` and `elementTest`
         newCode.add(elementCode)
       else:
         let newInput = quote do: `input`[`i`]
         let (elementTest, elementCode) = load(element, newInput, capture)
-        if test.isNil:
-          test = elementTest
-        else:
-          test = quote do: `test` and `elementTest`
+        #if test.isNil:
+        #  test = elementTest
+        #else:
+        test = quote do: `test` and `elementTest`
         # newCode.add(elementCode)
 
   of nnkPrefix:
@@ -514,6 +532,13 @@ macro eKind*(a: typed): untyped =
   let kindField = loadKindField(a.getType)
   result = quote:
     `a`.`kindField`
+
+proc isNil2*[T: not ref](t: T): bool =
+  false
+
+proc isNil2*[T: ref](t: T): bool =
+  t.isNil
+
 
 # Faith Lord!
 proc Some*[T](a: Option[T]): T =

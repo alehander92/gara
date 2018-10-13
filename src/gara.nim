@@ -2,7 +2,7 @@
 # exports the main API in this file. Note that you cannot rename this file
 # but you can remove it if you wish.
 
-import macros, strformat, strutils, sequtils, tables, algorithm, sets, options
+import macros, strformat, strutils, sequtils, tables, algorithm, sets, options, typetraits
 
 proc add*(x, y: int): int =
   ## Adds two files together.
@@ -10,6 +10,8 @@ proc add*(x, y: int): int =
 
 type
   ExperimentError* = object of Exception
+
+  TypeKind* = enum TNormal, TEnum, TType, TRef
 
 var assignNames {.compileTime.} = @[initSet[string]()]
 
@@ -22,7 +24,7 @@ proc genAssign*(name: NimNode, a: NimNode): NimNode =
       let `name` = `a`; true
     if assignNames.len == 0:
       assignNames.add(initSet[string]())
-    echo assignNames[^1]
+    # echo assignNames[^1]
     var e = assignNames[^1]
     e.incl(text)
     assignNames[^1] = e
@@ -82,7 +84,7 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
 
   if not itTest.isNil:
     for section in itTest:
-      echo section.lisprepr
+      # echo section.lisprepr
       # let name = code
       # generates let name = inputNode.mapIt(code)
       if section.kind == nnkLetSection:
@@ -113,10 +115,12 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
       `test` and `assign`
   result = (test, newCode, 0)
 
+
 # FAITH
 proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode) =
   var test: NimNode
   var newCode: NimNode
+
   case pattern.kind:
   of nnkIntLit, nnkStrLit:
     (test, newCode) = atomTest(pattern, input, capture)
@@ -168,7 +172,14 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
           test = quote do: `test` and `elementTest`
         newCode.add(elementCode)
       else:
-        error "pattern not supported"
+        let newInput = quote do: `input`[`i`]
+        let (elementTest, elementCode) = load(element, newInput, capture)
+        if test.isNil:
+          test = elementTest
+        else:
+          test = quote do: `test` and `elementTest`
+        # newCode.add(elementCode)
+
   of nnkPrefix:
     # @object or ~object
     # @name generates a capturing name, @list a seq match and ~object a variant match
@@ -452,6 +463,22 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
       newCode = emptyStmtList()
     else:
       error "pattern not supported"
+  of nnkTupleConstr:
+    # (pattern,)
+    #
+    # generates
+    #
+    # input is tuple and input.type.arity == 1 and ..
+    #
+
+    let child = pattern[0]
+    let newInput = quote do: `input`[0]
+    let (childTest, childCode) = load(child, newInput, capture)
+    
+    test = quote: 
+      `input` is tuple and `input`.type.arity == 1 and `childTest`
+
+    newCode = childCode
   else:
     error "pattern not supported"
   (test, newCode)
@@ -469,8 +496,8 @@ proc matchBranch(branch: NimNode, input: NimNode, capture: int = -1): (NimNode, 
     result = (nnkElse.newTree(branch[0]), true)
   else:
     error "expected of or else"
-  echo result[0].repr
-  echo "#"
+  # echo result[0].repr
+  # echo "#"
 
 proc loadKindField(t: NimNode): NimNode =
   var u = t
@@ -510,8 +537,6 @@ macro `~`*(node: untyped): untyped =
     initVariant(`a`, `b`, `fields`)
 
 macro matches*(input: untyped, pattern: untyped): untyped =
-  echo input.repr
-  echo pattern.repr
   let (test, newCode) = load(pattern, input, -1)
   result = test
 
@@ -553,9 +578,10 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
         raise newException(ExperimentError, "nothing matched in pattern expression")
       exception = nnkElse.newTree(exception)
       result.add(exception)
-    echo result.repr
-    echo "##"
+    # echo result.repr
+    # echo "##"
 
 
-export sequtils, options
+export sequtils, options, typetraits
+
 

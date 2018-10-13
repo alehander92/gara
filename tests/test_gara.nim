@@ -92,13 +92,19 @@ suite "match":
     else:
       fail()
 
+    # _ is always true, (a: 4, b: 4) didn't match element 2
+
+    # _ is alway.. a.a was 4, but a.b wasn't 4 => not a match
+
+
+
   test "Sequence subpattern":
     let a = @[Rectangle(a: 2, b: 4), Rectangle(a: 4, b: 0), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4)]
 
     match(a):
     of @[]:
       fail()
-    of @[_, _, *(a: @list)]:
+    of @[_, _, *(a: @list)]: 
       check(list == @[4, 4])
     else:
       fail()
@@ -171,6 +177,20 @@ suite "match":
     else:
       fail()
 
+
+  test "nameless tuple":
+    let a = ("a", "b")
+
+    match a:
+    of ("a",):
+      fail() # check the arity first
+    of ("a", "c"):
+      fail()
+    of ("a", @c):
+      check(c == "b")
+    else:
+      fail()
+
 suite "matches":
   test "bool":
     let a = Rectangle(a: 0, b: 0)
@@ -188,6 +208,18 @@ suite "matches":
     let g = c.get
     check(g.a == 0)
     check(g.b == 0)
+
+ 
+  # TODO
+  # test "set":
+  #  let a = {'a', 'b'}
+
+  #  match(a):
+  #  of {'b', @y}:
+  #    check(y == 'a')
+  #  else:
+  #    fail()
+
 
 
 suite "kind":

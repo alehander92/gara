@@ -1,6 +1,6 @@
-# based on status-im's nim repo
-
 language: c # or other C/C++ variants
+
+# based on status-im's nim repo
 
 sudo: false
 

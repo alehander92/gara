@@ -1,3 +1,5 @@
+[![Build Status (Travis)](https://img.shields.io/travis/alehander42/gara/master.svg?) "build status")](https://travis-ci.org/alehander42/gara)
+
 # gara
 
 A nim macro-based pattern matching library.

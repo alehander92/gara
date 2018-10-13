@@ -1,0 +1,37 @@
+# based on status-im's nim repo
+
+language: c # or other C/C++ variants
+
+sudo: false
+
+# https://docs.travis-ci.com/user/caching/
+#
+# Caching the whole nim folder is better than relying on ccache - this way, we
+# skip the expensive bootstrap process and linking
+cache:
+  directories:
+    - nim
+
+os:
+  - linux
+  - osx
+
+install:
+  - "export NIMVER=$(git ls-remote https://github.com/nim-lang/nim.git HEAD | cut -f 1)"
+
+  # after building nim, wipe csources to save on cache space
+  - "{ [ -f nim/$NIMVER/bin/nim ] && [ -f nim/$NIMVER/bin/nimble ] ; } ||
+      { rm -rf nim ;
+        mkdir -p nim ;
+        git clone --depth=1 https://github.com/nim-lang/nim.git nim/$NIMVER ;
+        cd nim/$NIMVER ;
+        sh build_all.sh ;
+        rm -rf csources ;
+        cd ../.. ;
+      }"
+  - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
+
+script:
+  - nimble install -y
+  - nim c tests/test_gara.nim
+  - ./tests/test_gara

@@ -139,7 +139,11 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
   var newCode: NimNode
 
   case pattern.kind:
-  of nnkIntLit, nnkStrLit:
+  of nnkIntLit, nnkInt8Lit,
+    nnkInt16Lit, nnkInt32Lit, nnkInt64Lit, nnkUIntLit, nnkUInt8Lit,
+    nnkUInt16Lit, nnkUInt32Lit, nnkUInt64Lit, nnkFloatLit,
+    nnkFloat32Lit, nnkFloat64Lit, nnkFloat128Lit, nnkStrLit, nnkRStrLit,
+    nnkTripleStrLit, nnkNilLit, nnkDotExpr:
     (test, newCode) = atomTest(pattern, input, capture)
   of nnkCommand:
     if pattern[1].kind != nnkPrefix or pattern[1][0].repr != "@":

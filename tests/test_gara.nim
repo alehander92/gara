@@ -215,6 +215,32 @@ suite "match":
     else:
       check(true)
 
+  test "string":
+    let a = "a"
+
+    match a:
+    of "a":
+      check(true)
+    else:
+      fail()
+
+  test "weird integers":
+    let a = 4
+
+    match a:
+    of 4'i8:
+      check(true)
+    else:
+      fail()
+  
+  test "dot access":
+    let a = Rectangle(b: 4)
+
+    match a:
+    of (b: a.b):
+      check(true)
+    else:
+      fail()
 
 suite "matches":
   test "bool":

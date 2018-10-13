@@ -14,7 +14,6 @@ cache:
 
 os:
   - linux
-  - osx
 
 install:
   - "export NIMVER=$(git ls-remote https://github.com/nim-lang/nim.git HEAD | cut -f 1)"

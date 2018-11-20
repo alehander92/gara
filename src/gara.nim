@@ -505,19 +505,41 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     error "pattern not supported"
   (test, newCode)
 
+proc loadNodes(branch: NimNode): (NimNode, NimNode) =
+  case branch.kind:
+  of nnkCall:
+    if branch.len == 2:
+      result = (branch[0], branch[1])
+    else:
+      result[0] = nnkCall.newTree()
+      for i, child in branch:
+        if i < branch.len - 1:
+          result[0].add(child)
+      result[1] = branch[^1]
+  of nnkCommand, nnkPrefix:
+    result = (branch.kind.newTree(branch[0], branch[1]), branch[2])
+  of nnkInfix:
+    result = (branch.kind.newTree(branch[0], branch[1], branch[2]), branch[3])
+  else:
+    result = (nil, nil)
+    
 proc matchBranch(branch: NimNode, input: NimNode, capture: int = -1): (NimNode, bool) =
   case branch.kind:
-  of nnkOfBranch:
-    let pattern = branch[0]
-    let code = branch[1]
-    assignNames = @[]
-    var (test, newCode) = load(pattern, input, capture)
-    newCode = code #.add(code)
-    result = (nnkElIfBranch.newTree(test, newCode), false)
-  of nnkElse:
-    result = (nnkElse.newTree(branch[0]), true)
+  of nnkCall, nnkCommand, nnkPrefix, nnkInfix: 
+    echo branch.treerepr
+    let (pattern, code) = loadNodes(branch)
+    if pattern.kind == nnkIdent and pattern.repr == "_":
+      result = (nnkElse.newTree(branch[1]), true)
+    else:
+      echo pattern.treerepr
+      echo code.treerepr
+      assignNames = @[]
+      var (test, newCode) = load(pattern, input, capture)
+      newCode = code #.add(code)
+      result = (nnkElIfBranch.newTree(test, newCode), false)
   else:
-    error "expected of or else"
+    echo branch.treerepr
+    error "expected pattern"
   # echo result[0].repr
   # echo "#"
 
@@ -596,7 +618,7 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
 
     result = nnkIfStmt.newTree()
     var hasElse = false
-    for branch in branches:
+    for branch in branches[0]:
       let (b, isElse) = matchBranch(branch, input)
       if isElse:
         hasElse = true

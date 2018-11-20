@@ -43,54 +43,54 @@ suite "match":
     let a = 2
 
     match(a):
-    of 2:
-      discard
-    else:
-      fail()
+      2:
+        discard
+      _:
+        fail()
 
   test "Capturing":
     let a = 2
 
     match(a):
-    of 2 @b:
-      check(b == 2)
-    else:
-      fail()
+      2 @b:
+        check(b == 2)
+      _:
+        fail()
     
 
   test "Object":
     let a = Rectangle(a: 2, b: 0)
 
     match(a):
-    of (a: 4, b: 1):
-      fail()
-    of (a: 2, b: @b):
-      check(b == 0)
-    else:
-      fail()
+      (a: 4, b: 1):
+        fail()
+      (a: 2, b: @b):
+        check(b == 0)
+      _:
+        fail()
 
   test "Subpattern":
     let a = repo # look in beginning
 
     match(a):
-    of (name: "New", commits: @[]):
-      fail()
-    of (name: @name, author: Author(name: "Example Author", email: @email), commits: @commits):
-      check(name == "ExampleDB")
-      check(email.raw == "example@exampledb.org")
-    else:
-      fail()
+      (name: "New", commits: @[]):
+        fail()
+      (name: @name, author: Author(name: "Example Author", email: @email), commits: @commits):
+        check(name == "ExampleDB")
+        check(email.raw == "example@exampledb.org")
+      _:
+        fail()
 
   test "Sequence":
     let a = @[Rectangle(a: 2, b: 4), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4)]
 
     match(a):
-    of @[]:
-      fail()
-    of @[_, *(a: 4, b: 4) @others]:
-      check(others == a[1 .. ^1])
-    else:
-      fail()
+      @[]:
+        fail()
+      @[_, *(a: 4, b: 4) @others]:
+        check(others == a[1 .. ^1])
+      _:
+        fail()
 
     # _ is always true, (a: 4, b: 4) didn't match element 2
 
@@ -102,23 +102,23 @@ suite "match":
     let a = @[Rectangle(a: 2, b: 4), Rectangle(a: 4, b: 0), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4)]
 
     match(a):
-    of @[]:
-      fail()
-    of @[_, _, *(a: @list)]: 
-      check(list == @[4, 4])
-    else:
-      fail()
+      @[]:
+        fail()
+      @[_, _, *(a: @list)]: 
+        check(list == @[4, 4])
+      _:
+        fail()
 
   test "Variant":
     let a = ~Commit.Normal(message: "e", diff: "z")
 
     match(a):
-    of Merge(original: @original, other: @other):
-      fail()
-    of Normal(message: @message):
-      check(message == "e")
-    else:
-      fail()
+      Merge(original: @original, other: @other):
+        fail()
+      Normal(message: @message):
+        check(message == "e")
+      _:
+        fail()
 
   test "Custom unpackers":
     let email = repo.author.email
@@ -143,53 +143,53 @@ suite "match":
         result.add(token)
 
     match(email):
-    of data(name: "academy"):
-      fail()
-    of tokens(@[_, _, _, _, @token]):
-      check(token == "org")
+      data(name: "academy"):
+        fail()
+      tokens(@[_, _, _, _, @token]):
+        check(token == "org")
 
   test "if":
     let b = @[4, 0]
 
     match(b):
-    of @[_, @t] and t mod 2 == 0:
-      check(t == 0)
-    else:
-      fail()
+      @[_, @t] and t mod 2 == 0:
+        check(t == 0)
+      _:
+        fail()
 
   test "unification":
     let b = @["nim", "nim", "c++"]
 
     match(b):
-    of @[@x, @x, @x]:
-      fail()
-    of @[@x, @x, _]:
-      check(x == "nim")
-    else:
-      fail()
+      @[@x, @x, @x]:
+        fail()
+      @[@x, @x, _]:
+        check(x == "nim")
+      _:
+        fail()
 
   test "option":
     let a = some[int](3)
 
     match(a):
-    of Some(@i):
-      check(i == 3)
-    else:
-      fail()
+      Some(@i):
+        check(i == 3)
+      _:
+        fail()
 
 
   test "nameless tuple":
     let a = ("a", "b")
 
     match a:
-    of ("a",):
-      fail() # check the arity first
-    of ("a", "c"):
-      fail()
-    of ("a", @c):
-      check(c == "b")
-    else:
-      fail()
+      ("a",):
+        fail() # check the arity first
+      ("a", "c"):
+        fail()
+      ("a", @c):
+        check(c == "b")
+      _:
+        fail()
   
   test "ref":
     type
@@ -200,47 +200,47 @@ suite "match":
     let node = Node(name: "2")
 
     match node:
-    of (name: @name):
-      check(name == "2")
-    else:
-      fail()
+      (name: @name):
+        check(name == "2")
+      _:
+        fail()
 
     let node2: Node = nil
 
     match node2:
-    of (name: "4"):
-      fail()
-    of Node(name: "4"):
-      fail()
-    else:
-      check(true)
+      (name: "4"):
+        fail()
+      Node(name: "4"):
+        fail()
+      _:
+        check(true)
 
   test "string":
     let a = "a"
 
     match a:
-    of "a":
-      check(true)
-    else:
-      fail()
+      "a":
+        check(true)
+      _:
+        fail()
 
   test "weird integers":
     let a = 4
 
     match a:
-    of 4'i8:
-      check(true)
-    else:
-      fail()
+      4'i8:
+        check(true)
+      _:
+        fail()
   
   test "dot access":
     let a = Rectangle(b: 4)
 
     match a:
-    of (b: a.b):
-      check(true)
-    else:
-      fail()
+      (b: a.b):
+        check(true)
+      _:
+        fail()
 
 suite "matches":
   test "bool":
@@ -266,9 +266,9 @@ suite "matches":
   #  let a = {'a', 'b'}
 
   #  match(a):
-  #  of {'b', @y}:
+  #    {'b', @y}:
   #    check(y == 'a')
-  #  else:
+  #    _:
   #    fail()
 
 

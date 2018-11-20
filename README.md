@@ -17,11 +17,11 @@ A `maybeMatches` macro which returns an `Option[tuple]` of the matched "variable
 var rectangles = @[Rectangle(a: 0, b: 2), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4), Rectangle(a: 4, b: 4)]
 
 match(rectangles):
-  of @[]:
+  @[]:
     fail()
-  of @[_, *(a: 4, b: 4) @others]: # (a: 4, b: 4) is a shorthand for `TypeName(field: value)`, see the next examples
+  @[_, *(a: 4, b: 4) @others]: # (a: 4, b: 4) is a shorthand for `TypeName(field: value)`, see the next examples
     check(others == a[1 .. ^1]) # we match the rest, because they all match subpattern
-  else:
+  _:
     fail()
 ```
 
@@ -104,10 +104,10 @@ Just test for equality with the value. Works also if you pass an existing variab
 let a = 2
 
 match(a):
-of 2:
-  echo "2"
-else:
-  echo "no 2"
+  2:
+    echo "2"
+  _:
+    echo "no 2"
 ```
 
 ### Types
@@ -116,10 +116,10 @@ The library tests with `is`
 
 ```nim
 match(a):
-of Rectangle: # matches Rectangle(a: 0), Rectangle(a: 2, b: 4)
-  echo "rectangle"
-else:
-  echo "other"
+  Rectangle: # matches Rectangle(a: 0), Rectangle(a: 2, b: 4)
+    echo "rectangle"
+  _:
+    echo "other"
 ```
 
 ### Objects
@@ -134,12 +134,12 @@ You can pass just some of the fields!
 var rectangle = Rectangle(a: 0, b: 0)
 
 match(rectangle):
-of (a: 0, b: 0): # matches Rectangle(a: 0, b: 0)
-  echo "ok"
-of Rectangle(a: -2): # matches Rectangle(a: -2) (a: -2, e: 4)
-  echo "weird"
-else:
-  echo 0
+  (a: 0, b: 0): # matches Rectangle(a: 0, b: 0)
+    echo "ok"
+  Rectangle(a: -2): # matches Rectangle(a: -2) (a: -2, e: 4)
+    echo "weird"
+  -:
+    echo 0
 ```
 
 ### Subpatterns
@@ -149,10 +149,10 @@ You can match subpatterns.
 ```nim
 var a = A(b: B(c: 0, e: 2))
 match(a):
-of A(b: B(c: 0)):
-  echo "ok"
-else:
-  echo "fail"
+  A(b: B(c: 0)):
+    echo "ok"
+  _:
+    echo "fail"
 ```
 
 ### Capturing
@@ -162,11 +162,11 @@ You write `stuff @name` which shouldn't be ambigious in general(please read the 
 
 ```nim
 match(a):
-of C(e: E(f: @f) @e): # matches C(e: E(f: 0)) and creates local variables f = 0 and e = E(..)
-  echo e
-  echo f
-else:
-  echo "fail"
+  C(e: E(f: @f) @e): # matches C(e: E(f: 0)) and creates local variables f = 0 and e = E(..)
+    echo e
+    echo f
+  _:
+    echo "fail"
 ```
 
 ### Variants
@@ -175,34 +175,34 @@ We recognize when you do `enumLabel(..)` and we match variants then. That's very
 
 ```nim
 match(a):
-of Merge(original: @original, other: @other):
-  echo original
-of Normal(message: @message):
-  echo message
-else:
-  echo a
+  Merge(original: @original, other: @other):
+    echo original
+  Normal(message: @message):
+    echo message
+  _:
+    echo a
 ```
 
 ### Wildcards
 
-You can use `_` as a wildcard, it always succeeds.
+You can use `_` as a wildcard, it always succeeds. It's also used as `otherwise`.
 
 ```nim
 match(a):
-of _: # matches any value
-  echo a
-else:
-  echo "nope"
+  @[_]: # matches any value
+    echo a
+  _:
+    echo "nope"
 ```
 
 ### seq
 
 ```nim
 match(a):
-of @[4, 5]: # matches @[4, 5]
-  echo "ok"
-else:
-  echo "no"
+  @[4, 5]: # matches @[4, 5]
+    echo "ok"
+  _:
+    echo "no"
 ```
 
 ### Many elements in seq
@@ -212,10 +212,10 @@ You can match repeated properties
 ```nim
 var rectangles = @[e, e, Rectangle(a: 0)]
 match(a):
-of @[_, _, *(a: @list)]: # creates a local variable list which collects the a fields in the matches elements : @[0]
-  echo list
-else:
-  echo @[]
+  @[_, _, *(a: @list)]: # creates a local variable list which collects the a fields in the matches elements : @[0]
+    echo list
+  _:
+    echo @[]
 ```
 
 Here we match the elements after 1 and collect their a fields. You can also just `@name` the whole subpattern: it should be always a seq.
@@ -261,10 +261,10 @@ proc tokens(email: Email): seq[string] =
     result.add(token)
 
 match(email):
-of data(name: "academy"): # matches data(email) with (name: "academy")
-  echo email
-of tokens(@[_, _, _, _, @token]): # matches tokens(email)
-  echo token
+  data(name: "academy"): # matches data(email) with (name: "academy")
+    echo email
+  tokens(@[_, _, _, _, @token]): # matches tokens(email)
+    echo token
 ```
 
 (I got the idea for the email example from @andreaferretti's patty)
@@ -283,10 +283,10 @@ proc eKind*(a: A): AKind =
 
 ```nim
 match(a);
-of (b: @e) and e == 4: # generates local variable e and checks e
-  echo e
-else:
-  echo -1
+  (b: @e) and e == 4: # generates local variable e and checks e
+    echo e
+  _:
+    echo -1
 ```
 
 We can add `or` too: does it make sense?
@@ -298,10 +298,10 @@ inspired by @andreaferretti's patty ideas
 ```nim
 let a = @[0, 0]
 match(a):
-of @[@x, @x]: # creates a local variable x only if both values are equal
-  echo "equal"
-else:
-  echo "not"
+  @[@x, @x]: # creates a local variable x only if both values are equal
+    echo "equal"
+  _:
+    echo "not"
 ```
 
 We check if all the subvalues are equal: that wasn't very easy to implement
@@ -352,6 +352,8 @@ I want to leave all the type checking to the Nim compiler. The library translate
 
 I like to think it is relatively simple: I've tried to limit new syntax and to optimize it for variants, so e.g. in `name(..)` we first check if name is enum, then type, then we assume it might be an unpacker. In the beginning I even had `~enum` syntax for matching variants, but it seemed crazy.
 Otherwise a lot of custom or new functionality should be doable with unpackers or with a bit upgraded unpackers, please check them out
+
+FAITH
 
 ### Credits
 [@krux02](https://github.com/krux02/) and [@andreaferretti](https://github.com/andreaferretti) are authors of the original nim pattern matching libs:

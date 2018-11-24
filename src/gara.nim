@@ -483,6 +483,12 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
       test = quote:
         `a` and `condition`
       newCode = emptyStmtList()
+    of "or":
+      var (l0, l1) = load(pattern[1], input, capture)
+      var (r0, r1) = load(pattern[2], input, capture)
+      test = quote:
+        `l0` or `r0`
+      newCode = emptyStmtList()
     else:
       error "pattern not supported"
   of nnkTupleConstr:
@@ -526,19 +532,19 @@ proc loadNodes(branch: NimNode): (NimNode, NimNode) =
 proc matchBranch(branch: NimNode, input: NimNode, capture: int = -1): (NimNode, bool) =
   case branch.kind:
   of nnkCall, nnkCommand, nnkPrefix, nnkInfix: 
-    echo branch.treerepr
+    # echo branch.treerepr
     let (pattern, code) = loadNodes(branch)
     if pattern.kind == nnkIdent and pattern.repr == "_":
       result = (nnkElse.newTree(branch[1]), true)
     else:
-      echo pattern.treerepr
-      echo code.treerepr
+      # echo pattern.treerepr
+      # echo code.treerepr
       assignNames = @[]
       var (test, newCode) = load(pattern, input, capture)
       newCode = code #.add(code)
       result = (nnkElIfBranch.newTree(test, newCode), false)
   else:
-    echo branch.treerepr
+    # echo branch.treerepr
     error "expected pattern"
   # echo result[0].repr
   # echo "#"

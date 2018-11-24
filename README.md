@@ -138,7 +138,7 @@ match(rectangle):
     echo "ok"
   Rectangle(a: -2): # matches Rectangle(a: -2) (a: -2, e: 4)
     echo "weird"
-  -:
+  _:
     echo 0
 ```
 
@@ -316,10 +316,10 @@ if a.matches((b: 2, c: 4)):
 
 ```
 
-You can also have captures with maybeMatch: it returns an `Option[tuple]`.
+You can also have captures with `maybeMatches`: it returns an `Option[tuple]`.
 
 ```nim
-let c = a.matches((a: @a, b: @b))
+let c = a.maybeMatches((a: @a, b: @b))
 if c.isSome:
   echo c.a
   echo c.b

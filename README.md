@@ -364,3 +364,5 @@ FAITH
 I took inspiration from their libraries and discussions (An early version of this dsl was even a PR to @krux02 's lib).
 
 Thanks to [@mratsim](https://github.com/mratsim) for giving me the `@name` idea with one of his [github comments on possible nim pattern matching syntax](https://github.com/nim-lang/Nim/issues/8649#issuecomment-413318800), I initially had way more inconsistent notation in mind.
+
+Thanks to [@narimiran](https://github.com/narimiran/) for giving design ideas and doc fixes!

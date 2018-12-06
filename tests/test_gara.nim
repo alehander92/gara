@@ -247,6 +247,7 @@ suite "match":
 
     match a:
       [1, @a, 3, @b, 5]:
+        echo a
         fail()
       [1, @a, 3, @b]:
         check(a == 2 and b == 4)
@@ -265,11 +266,12 @@ suite "matches":
   test "option":
     let a = Rectangle(a: 0, b: 0)
 
-    let c = a.maybeMatches((a: @a, b: @b))
+    # don't use things that clash with env? huh, TODO
+    let c = a.maybeMatches((a: @a2, b: @b2))
     check(c.isSome)
     let g = c.get
-    check(g.a == 0)
-    check(g.b == 0)
+    check(g.a2 == 0)
+    check(g.b2 == 0)
 
 
   # TODO

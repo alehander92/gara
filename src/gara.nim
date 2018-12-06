@@ -132,7 +132,7 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
       `test` and `assign`
   result = (test, newCode, 0)
 
-proc loadList(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode) =
+proc loadList(pattern: NimNode, input: NimNode, capture: int = -1, isArray: bool = false): (NimNode, NimNode) =
   # sequence or array match: it matches its elements
   # generates:
   #
@@ -174,7 +174,17 @@ proc loadList(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, Ni
         t = quote do: `t` and `elementTest`
       newCode.add(elementCode)
     let minTest =  quote do: `input`.len >= `min`
-    test = quote do: `minTest` and `t`
+    if not isArray:
+      test = quote do: `minTest` and `t`
+    else:
+      test = quote:
+        when `minTest`:
+          `t`
+        else:
+          false
+      newCode = quote:
+        when `minTest`:
+          `newCode`
 
   result = (test, newCode)
 
@@ -248,7 +258,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
         # newCode.add(elementCode)
 
   of nnkBracket:
-    (test, newCode) = loadList(pattern, input, capture)
+    (test, newCode) = loadList(pattern, input, capture, isArray=true)
 
   of nnkPrefix:
     # @object or ~object
@@ -550,7 +560,13 @@ proc matchBranch(branch: NimNode, input: NimNode, capture: int = -1): (NimNode, 
       # echo code.treerepr
       assignNames = @[]
       var (test, newCode) = load(pattern, input, capture)
-      newCode = code #.add(code)
+      if newCode.kind == nnkWhenStmt:
+        let whenTest = newCode[0][0]
+        newCode = quote:
+          when `whenTest`:
+            `code`
+      else:
+        newCode = code
       result = (nnkElIfBranch.newTree(test, newCode), false)
   else:
     # echo branch.treerepr
@@ -624,6 +640,7 @@ macro maybeMatches*(input: untyped, pattern: untyped): untyped =
       else:
         tmp = none[(`tupleInit`).type]()
       tmp
+  # echo result.repr
 
 macro match*(input: typed, branches: varargs[untyped]): untyped =
   if branches.len == 0:

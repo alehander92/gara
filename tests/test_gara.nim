@@ -20,7 +20,7 @@ type
 
   # just an example: nice for match
   CommitType = enum Normal, Merge, First, Fix
-  
+
   Commit = ref object
     case t: CommitType:
     of Normal:
@@ -56,7 +56,7 @@ suite "match":
         check(b == 2)
       _:
         fail()
-    
+
 
   test "Object":
     let a = Rectangle(a: 2, b: 0)
@@ -104,7 +104,7 @@ suite "match":
     match(a):
       @[]:
         fail()
-      @[_, _, *(a: @list)]: 
+      @[_, _, *(a: @list)]:
         check(list == @[4, 4])
       _:
         fail()
@@ -190,7 +190,7 @@ suite "match":
         check(c == "b")
       _:
         fail()
-  
+
   test "ref":
     type
       Node = ref object
@@ -232,13 +232,24 @@ suite "match":
         check(true)
       _:
         fail()
-  
+
   test "dot access":
     let a = Rectangle(b: 4)
 
     match a:
       (b: a.b):
         check(true)
+      _:
+        fail()
+
+  test "arrays":
+    let a = [1, 2, 3, 4]
+
+    match a:
+      [1, @a, 3, @b, 5]:
+        fail()
+      [1, @a, 3, @b]:
+        check(a == 2 and b == 4)
       _:
         fail()
 
@@ -260,7 +271,7 @@ suite "matches":
     check(g.a == 0)
     check(g.b == 0)
 
- 
+
   # TODO
   # test "set":
   #  let a = {'a', 'b'}

@@ -82,7 +82,7 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
   let inputNode = quote do: `input`[`i` .. ^1]
   var (itTest, itNode) = load(manyPattern, ident("it"), capture)
 
-  
+
   var newItTest = itTest
 
   if not itTest.isNil:
@@ -116,7 +116,7 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
             newItTest[i].add(child)
 
   itTest = newItTest
-  
+
   if itTest.repr == "true":
     test = itTest # optimized
   else:
@@ -126,12 +126,57 @@ proc loadManyPattern(pattern: NimNode, input: NimNode, i: int, capture: int = -1
     test = quote:
       `test` and `newCode`
   if not name.isNil:
-    # slow, we need views for zero overhead: https://github.com/nim-lang/Nim/issues/5753  
+    # slow, we need views for zero overhead: https://github.com/nim-lang/Nim/issues/5753
     let assign = genAssign(name, inputNode)
     test = quote:
       `test` and `assign`
   result = (test, newCode, 0)
 
+proc loadList(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode) =
+  # sequence or array match: it matches its elements
+  # generates:
+  #
+  #
+  # if input.len >= a and elements # test
+  #
+  # capturing code # code
+  #
+  var test: NimNode
+  var newCode: NimNode
+  let elements = if pattern.kind == nnkBracket: pattern else: pattern[1]
+
+  if elements.len == 0:
+    test = quote do: `input` == `pattern`
+    newCode = emptyStmtList()
+  else:
+    var min = 0
+    var t: NimNode
+    newCode = emptyStmtList()
+    for i, element in elements:
+      let elementNode = quote do: `input`[`i`]
+      var elementTest: NimNode
+      var elementCode: NimNode
+      if not element.isManyPattern():
+        (elementTest, elementCode) = load(element, elementNode, capture)
+        min += 1
+      else:
+        if i != elements.len - 1:
+          error "pattern expected * last"
+        var elementMin = 0
+        # Thank God!
+        (elementTest, elementCode, elementMin) = loadManyPattern(element, input, i, capture)
+        # min is different for * and +
+        # we generate sequtils allIt
+        min += elementMin
+      if t.isNil:
+        t = elementTest
+      else:
+        t = quote do: `t` and `elementTest`
+      newCode.add(elementCode)
+    let minTest =  quote do: `input`.len >= `min`
+    test = quote do: `minTest` and `t`
+
+  result = (test, newCode)
 
 # FAITH
 proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNode) =
@@ -202,6 +247,9 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
         test = quote do: `test` and `elementTest`
         # newCode.add(elementCode)
 
+  of nnkBracket:
+    (test, newCode) = loadList(pattern, input, capture)
+
   of nnkPrefix:
     # @object or ~object
     # @name generates a capturing name, @list a seq match and ~object a variant match
@@ -219,55 +267,16 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
         # capturing code # code
         # let name = input
         #
-      
+
         let name = pattern[1]
         test = genAssign(name, input)
 
       of nnkBracket:
-        # @list a sequence match: it matches its elements
-        # generates:
-        #
-        #
-        # if input.len >= a and elements # test
-        # 
-        # capturing code # code
-        #
-
-        if pattern[1].len == 0:
-          test = quote do: `input` == `pattern`
-          newCode = emptyStmtList()
-        else:
-          var min = 0
-          var t: NimNode
-          newCode = emptyStmtList()
-          for i, element in pattern[1]:
-            let elementNode = quote do: `input`[`i`]
-            var elementTest: NimNode
-            var elementCode: NimNode
-            if not element.isManyPattern():
-              (elementTest, elementCode) = load(element, elementNode, capture)
-              min += 1
-            else:
-              if i != pattern[1].len - 1:
-                error "pattern expected * last"
-              var elementMin = 0
-              # Thank God!
-              (elementTest, elementCode, elementMin) = loadManyPattern(element, input, i, capture)
-              # min is different for * and +
-              # we generate sequtils allIt
-              min += elementMin
-            if t.isNil:
-              t = elementTest
-            else:
-              t = quote do: `t` and `elementTest`
-            newCode.add(elementCode)
-          let minTest =  quote do: `input`.len >= `min`
-          test = quote do: `minTest` and `t`
-            
+        (test, newCode) = loadList(pattern, input, capture)
       else:
         error "pattern not supported"
     of "~":
-      
+
       # ~kind(object) a variant, generates field matches and uses eKind for now
       let kind = pattern[1][0]
       test = quote:
@@ -301,7 +310,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     let call = typ
     let condition2 = quote:
       `typ` is enum
-    
+
     let condition1 = quote:
       `typ` is type
 
@@ -311,7 +320,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
         args.add(arg)
     tmpCount += 1
     var tmp = tmpCount
-      
+
     var branchNames = initSet[string]()
     # we only let new variables here, and then add them at the end, so you don't stop letting them in other
     assignNames.add(initSet[string]())
@@ -326,7 +335,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     #
     # no code
     #
-    # 
+    #
     var test1 = quote do: `input` is `typ`
     var fields = nnkPar.newTree()
     for i, field in pattern:
@@ -358,22 +367,22 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     branchNames.incl(assignNames.pop())
     test2 = quote do: `test2` and `childrenTest`
     code2.add(childrenCode)
-    
+
     if assignNames.len == 0:
       assignNames.add(initSet[string]())
     var e = assignNames[^1]
     e.incl(branchNames)
     assignNames[^1] = e
-    
+
     # :)
     test = quote:
-      when `condition2`: 
+      when `condition2`:
         `test2`
       elif `condition1`:
         `test1`
       else:
         `test0`
-    
+
     newCode = quote:
       when `condition2`:
         `code2`
@@ -383,7 +392,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
         `code0`
     newCode = nnkStmtList.newTree(newCode)
   of nnkCall:
-    
+
     # call(args), if call is an object, calls unpack(object) if it exists otherwise calls the function and checks if it matches args
     # generates
     #
@@ -392,7 +401,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     #
     #
     let call = pattern[0]
-    
+
     let condition = quote:
       not compiles(unpack(`input`))
 
@@ -412,7 +421,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     var tmpNode = ident("tmp" & $tmp)
     var header = quote:
       let `tmpNode` = unpack(`input`)
-    
+
     var test1 = quote do:`tmpNode`.len == `length`
     var newCode1 = emptyStmtList()
 
@@ -421,7 +430,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
       let (argTest, argCode) = load(pattern[j + 1], argInput, capture)
       test1 = quote do: `test1` and `argTest`
       newCode1.add(argCode)
-      
+
     for i, code in @[newCode0, newCode1]:
       var c = code
       while c.kind == nnkStmtList and c.len == 1:
@@ -443,7 +452,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
         `test0`
       else:
         `test1`
-    
+
     newCode = quote:
       when `condition`:
         `newCode0`
@@ -502,8 +511,8 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     let child = pattern[0]
     let newInput = quote do: `input`[0]
     let (childTest, childCode) = load(child, newInput, capture)
-    
-    test = quote: 
+
+    test = quote:
       `input` is tuple and `input`.type.arity == 1 and `childTest`
 
     newCode = childCode
@@ -528,10 +537,10 @@ proc loadNodes(branch: NimNode): (NimNode, NimNode) =
     result = (branch.kind.newTree(branch[0], branch[1], branch[2]), branch[3])
   else:
     result = (nil, nil)
-    
+
 proc matchBranch(branch: NimNode, input: NimNode, capture: int = -1): (NimNode, bool) =
   case branch.kind:
-  of nnkCall, nnkCommand, nnkPrefix, nnkInfix: 
+  of nnkCall, nnkCommand, nnkPrefix, nnkInfix:
     # echo branch.treerepr
     let (pattern, code) = loadNodes(branch)
     if pattern.kind == nnkIdent and pattern.repr == "_":

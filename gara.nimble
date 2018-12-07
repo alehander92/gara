@@ -2,7 +2,7 @@
 
 version       = "0.2.0"
 author        = "Alexander Ivanov"
-description   = "A new awesome nimble package"
+description   = "Macro-based pattern matching library."
 license       = "MIT"
 srcDir        = "src"
 

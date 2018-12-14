@@ -639,11 +639,11 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
     error "invalid match"
   else:
     let t = input.getType
-
     result = nnkIfStmt.newTree()
+    let tmp = genSym(nskLet, "tmmmmmmmp")
     var hasElse = false
     for branch in branches[0]:
-      let (b, isElse) = matchBranch(branch, input)
+      let (b, isElse) = matchBranch(branch, tmp)
       if isElse:
         hasElse = true
       if not b.isNil:
@@ -653,6 +653,10 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
         raise newException(ExperimentError, "nothing matched in pattern expression")
       exception = nnkElse.newTree(exception)
       result.add(exception)
+    result = quote:
+      block:
+        let `tmp` = `input`
+        `result`
     # echo result.repr
     # echo "##"
 

@@ -8,7 +8,7 @@ A nim macro-based pattern matching library.
 
 A library that provides a `match` macro which can be used as a pattern matching construct.
 
-A `matches` macro which returns true if a value is matched. 
+A `matches` macro which returns true if a value is matched.
 
 A `maybeMatches` macro which returns an `Option[tuple]` of the matched "variables".
 
@@ -30,7 +30,7 @@ It's still experimental, there are some bugs left and the design of the DSL migh
 
 ### Features
 
-Matching 
+Matching
 
 * values
 * types
@@ -57,7 +57,7 @@ Goals:
 * Expressive and flexible syntax for patterns and extensible hooks
 * Nice error reporting and pretty understandable generated code
 
-The goals are ordered by priority. 
+The goals are ordered by priority.
 
 Speed is very important: the goal is to be able to use matching everywhere where you'd use a complicated `if`/`case`.
 If there are cases, when we're slower:
@@ -73,7 +73,7 @@ Currently not every feature is optimized well(there are some blockers, and some 
 
 The library is supposed to be extensible: please take a look at the unpackers section. For example we already implement the option matching with a `Some` unpacker.
 
-I have a plan about the error reporting part: basically with several hooks inside the current code we should be able to produce 
+I have a plan about the error reporting part: basically with several hooks inside the current code we should be able to produce
 good messages. My plan API is
 
 ```nim
@@ -125,7 +125,7 @@ match(a):
 ### Objects
 
 We have a shorthand syntax for objects. You can type only the fields, and then we check only them: this is a good idea because usually
-you know the type of the object that you are passing, so there is rarely ambiguity. 
+you know the type of the object that you are passing, so there is rarely ambiguity.
 Of course you can still add the type if you want. You can use this for tuples too.
 
 You can pass just some of the fields!
@@ -306,9 +306,22 @@ match(a):
 
 We check if all the subvalues are equal: that wasn't very easy to implement
 
-### Match
+### Match expressions
 
-You can have matches as an expression: it returns a boolean value which is `true` when it matches the value.
+In general, `match` can be used as an expression:
+
+```nim
+let a = 2
+
+let s = match(a):
+  2:
+    "it's a 2"
+  _:
+    "it's not a 2"
+```
+
+The `matches` macro allows to match against a single expression:
+it returns a boolean value which is `true` when it matches the value.
 
 ```nim
 if a.matches((b: 2, c: 4)):

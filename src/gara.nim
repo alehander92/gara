@@ -207,7 +207,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     let testInit = quote:
       `newInit`
     test = quote do: `test` and `testInit`
-  of nnkPar:
+  of nnkPar, nnkTupleConstr:
     # (a: c, b: d) a pattern that matches objects or tuples
     # generates:
     #
@@ -502,22 +502,6 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
       newCode = emptyStmtList()
     else:
       error "pattern not supported"
-  of nnkTupleConstr:
-    # (pattern,)
-    #
-    # generates
-    #
-    # input is tuple and input.type.arity == 1 and ..
-    #
-
-    let child = pattern[0]
-    let newInput = quote do: `input`[0]
-    let (childTest, childCode) = load(child, newInput, capture)
-
-    test = quote:
-      `input` is tuple and `input`.type.arity == 1 and `childTest`
-
-    newCode = childCode
   else:
     error "pattern not supported"
   (test, newCode)

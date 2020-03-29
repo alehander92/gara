@@ -182,8 +182,8 @@ suite "match":
     let a = ("a", "b")
 
     match a:
-      ("a",):
-        fail() # check the arity first
+      ("a", "c"):
+        fail()
       ("a", "c"):
         fail()
       ("a", @c):
@@ -293,6 +293,3 @@ suite "kind":
 
     commit = ~Commit.Merge(original: commit, other: commit)
     check(commit.original.message == "e")
-
-
-

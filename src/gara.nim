@@ -5,7 +5,7 @@ type
 
   TypeKind* = enum TNormal, TEnum, TType, TRef
 
-var assignNames {.compileTime.} = @[initSet[string]()]
+var assignNames {.compileTime.} = @[initHashSet[string]()]
 
 var maybeVariables {.compileTime.}: seq[string] = @[]
 
@@ -15,7 +15,7 @@ proc genAssign*(name: NimNode, a: NimNode): NimNode =
     result = quote:
       let `name` = `a`; true
     if assignNames.len == 0:
-      assignNames.add(initSet[string]())
+      assignNames.add(initHashSet[string]())
     # echo assignNames[^1]
     var e = assignNames[^1]
     e.incl(text)
@@ -323,9 +323,9 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     tmpCount += 1
     var tmp = tmpCount
 
-    var branchNames = initSet[string]()
+    var branchNames = initHashSet[string]()
     # we only let new variables here, and then add them at the end, so you don't stop letting them in other
-    assignNames.add(initSet[string]())
+    assignNames.add(initHashSet[string]())
     var (test0, code0) = loadUnpacker(call, args, input, tmpCount)
     branchNames.incl(assignNames.pop())
 
@@ -343,7 +343,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     for i, field in pattern:
       if i > 0:
         fields.add(field)
-    assignNames.add(initSet[string]())
+    assignNames.add(initHashSet[string]())
     let (fieldTest, fieldCode) = load(fields, input, capture)
     branchNames.incl(assignNames.pop())
     test1 = quote do: `test1` and `fieldTest`
@@ -364,14 +364,14 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     for i, field in pattern:
       if i > 0:
         children.add(field)
-    assignNames.add(initSet[string]())
+    assignNames.add(initHashSet[string]())
     let (childrenTest, childrenCode) = load(children, input, capture)
     branchNames.incl(assignNames.pop())
     test2 = quote do: `test2` and `childrenTest`
     code2.add(childrenCode)
 
     if assignNames.len == 0:
-      assignNames.add(initSet[string]())
+      assignNames.add(initHashSet[string]())
     var e = assignNames[^1]
     e.incl(branchNames)
     assignNames[^1] = e

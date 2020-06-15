@@ -479,7 +479,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     else:
       test = quote:
         when `pattern` is enum:
-          `input`.eKind == `pattern`
+          `input` == `pattern`
         elif `pattern` is type:
           `input` is `pattern`
         else:
@@ -646,5 +646,3 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
 
 
 export sequtils, options, typetraits
-
-

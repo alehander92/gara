@@ -463,7 +463,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
 
     newCode = nnkStmtList.newTree(newCode)
 
-  of nnkIdent:
+  of nnkIdent, nnkSym:
     case pattern.repr:
     of "_":
       # wildcard: it matches everything

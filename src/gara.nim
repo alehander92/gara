@@ -620,7 +620,7 @@ macro maybeMatches*(input: untyped, pattern: untyped): untyped =
 
 macro match*(input: typed, branches: varargs[untyped]): untyped =
   if branches.len == 0:
-    error "invalid match"
+    error "At least one match branch expected, found 0"
   else:
     let t = input.getType
     result = nnkIfStmt.newTree()
@@ -633,14 +633,20 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
       if not b.isNil:
         result.add(b)
     if not hasElse:
+      let pos = input.lineInfoObj().line.newLit()
       var exception = quote:
-        raise newException(ExperimentError, "nothing matched in pattern expression")
+        raise newException(
+          ExperimentError,
+          "Nothing matched in pattern expression starting on line " & $`pos`
+        )
       exception = nnkElse.newTree(exception)
       result.add(exception)
     result = quote:
       block:
         let `tmp` = `input`
         `result`
+
+    # echo result.toStrLit()
     # echo result.repr
     # echo "##"
 

@@ -254,6 +254,28 @@ suite "match":
       _:
         fail()
 
+  type
+    Enum = enum
+      en1
+      en2
+
+  test "enum":
+    match en1:
+      en1:
+        discard
+      en2:
+        fail()
+
+  test "enum tuple":
+    match (en1, en1):
+      (en1, en2):
+        fail()
+      (en1, _):
+        discard
+      _:
+        fail()
+
+
 suite "matches":
   test "bool":
     let a = Rectangle(a: 0, b: 0)

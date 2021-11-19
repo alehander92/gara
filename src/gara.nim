@@ -463,7 +463,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
 
     newCode = nnkStmtList.newTree(newCode)
 
-  of nnkIdent:
+  of nnkIdent, nnkSym:
     case pattern.repr:
     of "_":
       # wildcard: it matches everything
@@ -479,7 +479,7 @@ proc load(pattern: NimNode, input: NimNode, capture: int = -1): (NimNode, NimNod
     else:
       test = quote:
         when `pattern` is enum:
-          `input`.eKind == `pattern`
+          `input` == `pattern`
         elif `pattern` is type:
           `input` is `pattern`
         else:
@@ -620,7 +620,7 @@ macro maybeMatches*(input: untyped, pattern: untyped): untyped =
 
 macro match*(input: typed, branches: varargs[untyped]): untyped =
   if branches.len == 0:
-    error "invalid match"
+    error "At least one match branch expected, found 0"
   else:
     let t = input.getType
     result = nnkIfStmt.newTree()
@@ -633,18 +633,22 @@ macro match*(input: typed, branches: varargs[untyped]): untyped =
       if not b.isNil:
         result.add(b)
     if not hasElse:
+      let pos = input.lineInfoObj().line.newLit()
       var exception = quote:
-        raise newException(ExperimentError, "nothing matched in pattern expression")
+        raise newException(
+          ExperimentError,
+          "Nothing matched in pattern expression starting on line " & $`pos`
+        )
       exception = nnkElse.newTree(exception)
       result.add(exception)
     result = quote:
       block:
         let `tmp` = `input`
         `result`
+
+    # echo result.toStrLit()
     # echo result.repr
     # echo "##"
 
 
 export sequtils, options, typetraits
-
-
